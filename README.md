@@ -9,6 +9,7 @@ Pierwszy etap nie buduje jeszcze całej wtyczki. Zaczynamy od małego Launchera,
 - uporządkowana struktura repozytorium,
 - prosty Launcher z ekranem Readiness,
 - wykrywanie folderu ComfyUI,
+- ręczne wskazanie folderu ComfyUI, jeśli autoskan go nie znajdzie,
 - widoczna sekcja LoRA od samego początku,
 - miejsce na przyszły workflow inpaintingu,
 - miejsce na przyszłe custom nodes RasterRelay.
@@ -34,6 +35,8 @@ cd C:\Users\Mierz\Desktop\RasterRelay\launcher
 npm install
 npm run tauri dev
 ```
+
+Jeśli Launcher nie znajdzie ComfyUI sam, kliknij `Wybierz folder ComfyUI` i wskaż główny folder ComfyUI. To musi być folder z plikiem `main.py`.
 
 Jeśli chcesz tylko sprawdzić ekran UI w przeglądarce, bez okna Tauri:
 

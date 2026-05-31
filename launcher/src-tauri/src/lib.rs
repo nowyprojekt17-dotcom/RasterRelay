@@ -48,10 +48,25 @@ fn scan_readiness() -> ReadinessReport {
     }
 }
 
+#[tauri::command]
+fn scan_readiness_for_path(path: String) -> ReadinessReport {
+    let selected_path = PathBuf::from(path);
+
+    if looks_like_comfyui(&selected_path) {
+        build_found_report(selected_path.clone(), vec![selected_path])
+    } else {
+        build_invalid_selected_report(selected_path)
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![scan_readiness])
+        .plugin(tauri_plugin_dialog::init())
+        .invoke_handler(tauri::generate_handler![
+            scan_readiness,
+            scan_readiness_for_path
+        ])
         .run(tauri::generate_context!())
         .expect("error while running RasterRelay Launcher");
 }
@@ -284,6 +299,108 @@ fn build_missing_report(candidates: Vec<PathBuf>) -> ReadinessReport {
     }
 }
 
+fn build_invalid_selected_report(selected_path: PathBuf) -> ReadinessReport {
+    let selected_path_text = path_text(&selected_path);
+
+    let missing_items = vec![
+        item(
+            "comfyui-root",
+            "Folder ComfyUI",
+            Some(&selected_path),
+            "błąd",
+            "Wybrany folder nie wygląda jak główny folder ComfyUI.",
+            Some("Wybierz ponownie"),
+            true,
+        ),
+        item(
+            "main-py",
+            "Plik main.py",
+            Some(&selected_path.join("main.py")),
+            "brak",
+            "W tym folderze nie ma pliku main.py.",
+            None,
+            true,
+        ),
+        item(
+            "python-env",
+            "Python / venv",
+            None,
+            "wymaga instalacji",
+            "Najpierw wybierz główny folder ComfyUI.",
+            Some("Install"),
+            true,
+        ),
+        item(
+            "custom-nodes",
+            "Custom nodes",
+            None,
+            "brak",
+            "Ten folder będzie sprawdzany po wybraniu właściwego ComfyUI.",
+            Some("Add"),
+            true,
+        ),
+        item(
+            "models",
+            "Modele",
+            None,
+            "brak",
+            "Ten folder będzie sprawdzany po wybraniu właściwego ComfyUI.",
+            Some("Add"),
+            true,
+        ),
+        item(
+            "loras",
+            "LoRA",
+            None,
+            "brak",
+            "LoRA będą sprawdzane po wybraniu właściwego ComfyUI.",
+            Some("Add"),
+            true,
+        ),
+        item(
+            "diffusion-models",
+            "Diffusion models",
+            None,
+            "brak",
+            "Ten folder będzie sprawdzany po wybraniu właściwego ComfyUI.",
+            Some("Add"),
+            false,
+        ),
+        item(
+            "text-encoders",
+            "Text encoders",
+            None,
+            "brak",
+            "Ten folder będzie sprawdzany po wybraniu właściwego ComfyUI.",
+            Some("Add"),
+            false,
+        ),
+        item(
+            "rasterrelay-nodes",
+            "RasterRelay nodes",
+            None,
+            "wymaga instalacji",
+            "To miejsce przygotujemy później w custom_nodes.",
+            Some("Install"),
+            false,
+        ),
+    ];
+
+    ReadinessReport {
+        comfyui_path: None,
+        summary: format!(
+            "Wybrano folder: {selected_path_text}. Brakuje w nim pliku main.py, więc to nie jest główny folder ComfyUI."
+        ),
+        counts: ReadinessCounts {
+            custom_nodes: 0,
+            loras: 0,
+            gguf_files: 0,
+        },
+        items: missing_items,
+        scanned_paths: vec![selected_path_text],
+    }
+}
+
 fn comfyui_candidates() -> Vec<PathBuf> {
     let mut candidates = Vec::new();
 
@@ -506,6 +623,42 @@ mod tests {
             count_files_with_extensions(&root, &["safetensors", "pt", "ckpt", "bin"], false);
 
         assert_eq!(count, 2);
+
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn selected_folder_without_main_py_returns_error_report() {
+        let root = temp_dir("selected-without-main");
+        fs::create_dir_all(&root).expect("create temp folder");
+
+        let report = scan_readiness_for_path(path_text(&root));
+
+        assert!(report.comfyui_path.is_none());
+        assert_eq!(report.items[0].status, "błąd");
+        assert_eq!(report.scanned_paths, vec![path_text(&root)]);
+
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn selected_folder_with_main_py_returns_found_report() {
+        let root = temp_dir("selected-with-main");
+        fs::create_dir_all(root.join("models").join("loras")).expect("create loras folder");
+        fs::create_dir_all(root.join("custom_nodes")).expect("create custom nodes folder");
+        fs::write(root.join("main.py"), "").expect("write main.py");
+        fs::write(
+            root.join("models").join("loras").join("style.safetensors"),
+            "",
+        )
+        .expect("write lora");
+        fs::write(root.join("models").join("flux.gguf"), "").expect("write gguf");
+
+        let report = scan_readiness_for_path(path_text(&root));
+
+        assert_eq!(report.comfyui_path, Some(path_text(&root)));
+        assert_eq!(report.counts.loras, 1);
+        assert_eq!(report.counts.gguf_files, 1);
 
         fs::remove_dir_all(root).ok();
     }

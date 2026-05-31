@@ -1,4 +1,4 @@
-# Launcher - etap 1
+# Launcher - etap 1 i 2
 
 Launcher jest małą aplikacją pomocniczą dla RasterRelay.
 
@@ -18,6 +18,14 @@ Jego pierwsze zadanie jest proste: sprawdzić, czy lokalne ComfyUI wygląda na g
 - ile jest custom nodes,
 - ile jest plików LoRA,
 - ile jest plików `.gguf`.
+
+## Co dodaje etap 2
+
+Etap 2 dodaje ręczne wskazanie folderu ComfyUI.
+
+Jeżeli autoskan nie znajdzie ComfyUI, użytkownik może kliknąć `Wybierz folder ComfyUI` i wskazać folder samodzielnie. Launcher sprawdzi, czy w folderze jest plik `main.py`.
+
+Jeżeli go nie ma, Launcher pokaże prosty komunikat, że to nie jest główny folder ComfyUI.
 
 ## Czego Launcher jeszcze nie robi
 
