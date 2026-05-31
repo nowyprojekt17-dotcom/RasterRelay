@@ -1,0 +1,14 @@
+# Node / frontend
+node_modules/
+launcher/node_modules/
+launcher/dist/
+launcher/vite-dev.log
+launcher/vite-dev.err.log
+
+# Tauri / Rust build output
+launcher/src-tauri/gen/
+launcher/src-tauri/target/
+
+# Local machine noise
+.DS_Store
+Thumbs.db
