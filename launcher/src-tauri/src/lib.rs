@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::env;
 use std::fs;
@@ -34,6 +34,36 @@ struct ReadinessItem {
     important: bool,
 }
 
+#[derive(Clone, Copy, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+enum AssetKind {
+    Lora,
+    Gguf,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AssetInstallValidation {
+    kind: String,
+    source_path: String,
+    target_dir: String,
+    target_path: String,
+    file_name: String,
+    status: String,
+    message: String,
+    can_install: bool,
+    target_dir_exists: bool,
+    will_create_target_dir: bool,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct AssetInstallResult {
+    success: bool,
+    destination_path: Option<String>,
+    message: String,
+}
+
 #[tauri::command]
 fn scan_readiness() -> ReadinessReport {
     let candidates = comfyui_candidates();
@@ -59,13 +89,77 @@ fn scan_readiness_for_path(path: String) -> ReadinessReport {
     }
 }
 
+#[tauri::command]
+fn validate_asset_install(
+    comfyui_path: String,
+    source_path: String,
+    kind: AssetKind,
+) -> AssetInstallValidation {
+    validate_asset_install_paths(
+        PathBuf::from(comfyui_path),
+        PathBuf::from(source_path),
+        kind,
+    )
+}
+
+#[tauri::command]
+fn install_asset(comfyui_path: String, source_path: String, kind: AssetKind) -> AssetInstallResult {
+    let validation = validate_asset_install_paths(
+        PathBuf::from(comfyui_path),
+        PathBuf::from(source_path),
+        kind,
+    );
+
+    if !validation.can_install {
+        return AssetInstallResult {
+            success: false,
+            destination_path: None,
+            message: validation.message,
+        };
+    }
+
+    let target_dir = PathBuf::from(&validation.target_dir);
+    let target_path = PathBuf::from(&validation.target_path);
+
+    if let Err(error) = fs::create_dir_all(&target_dir) {
+        return AssetInstallResult {
+            success: false,
+            destination_path: None,
+            message: format!("Nie udało się utworzyć folderu docelowego: {error}"),
+        };
+    }
+
+    if target_path.exists() {
+        return AssetInstallResult {
+            success: false,
+            destination_path: Some(validation.target_path),
+            message: "Taki plik już istnieje. Launcher nie nadpisuje plików.".to_string(),
+        };
+    }
+
+    match fs::copy(&validation.source_path, &target_path) {
+        Ok(_) => AssetInstallResult {
+            success: true,
+            destination_path: Some(path_text(&target_path)),
+            message: "Plik został skopiowany do ComfyUI.".to_string(),
+        },
+        Err(error) => AssetInstallResult {
+            success: false,
+            destination_path: Some(path_text(&target_path)),
+            message: format!("Nie udało się skopiować pliku: {error}"),
+        },
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             scan_readiness,
-            scan_readiness_for_path
+            scan_readiness_for_path,
+            validate_asset_install,
+            install_asset
         ])
         .run(tauri::generate_context!())
         .expect("error while running RasterRelay Launcher");
@@ -401,6 +495,162 @@ fn build_invalid_selected_report(selected_path: PathBuf) -> ReadinessReport {
     }
 }
 
+fn validate_asset_install_paths(
+    comfyui_path: PathBuf,
+    source_path: PathBuf,
+    kind: AssetKind,
+) -> AssetInstallValidation {
+    let source_path_text = path_text(&source_path);
+    let (target_dir, kind_label, allowed_extensions) = asset_target(&comfyui_path, kind);
+    let file_name = source_path
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("")
+        .to_string();
+    let target_path = if file_name.is_empty() {
+        target_dir.clone()
+    } else {
+        target_dir.join(&file_name)
+    };
+    let target_dir_exists = target_dir.is_dir();
+
+    if !looks_like_comfyui(&comfyui_path) {
+        return asset_validation(
+            kind_label,
+            source_path_text,
+            target_dir,
+            target_path,
+            file_name,
+            "błąd",
+            "Najpierw wybierz poprawny folder ComfyUI z plikiem main.py.",
+            false,
+            target_dir_exists,
+        );
+    }
+
+    if !source_path.is_file() {
+        return asset_validation(
+            kind_label,
+            source_path_text,
+            target_dir,
+            target_path,
+            file_name,
+            "błąd",
+            "Wybrana ścieżka nie jest plikiem.",
+            false,
+            target_dir_exists,
+        );
+    }
+
+    if file_name.is_empty() {
+        return asset_validation(
+            kind_label,
+            source_path_text,
+            target_dir,
+            target_path,
+            file_name,
+            "błąd",
+            "Nie udało się odczytać nazwy pliku.",
+            false,
+            target_dir_exists,
+        );
+    }
+
+    if !has_extension(&source_path, allowed_extensions) {
+        return asset_validation(
+            kind_label,
+            source_path_text,
+            target_dir,
+            target_path,
+            file_name,
+            "błąd",
+            extension_error_message(kind),
+            false,
+            target_dir_exists,
+        );
+    }
+
+    if target_path.exists() {
+        return asset_validation(
+            kind_label,
+            source_path_text,
+            target_dir,
+            target_path,
+            file_name,
+            "błąd",
+            "Taki plik już istnieje w folderze docelowym. Launcher nie nadpisuje plików.",
+            false,
+            target_dir_exists,
+        );
+    }
+
+    asset_validation(
+        kind_label,
+        source_path_text,
+        target_dir,
+        target_path,
+        file_name,
+        "gotowe",
+        if target_dir_exists {
+            "Plik wygląda poprawnie. Można go skopiować po potwierdzeniu."
+        } else {
+            "Plik wygląda poprawnie. Folder docelowy zostanie utworzony po potwierdzeniu."
+        },
+        true,
+        target_dir_exists,
+    )
+}
+
+fn asset_target(
+    comfyui_path: &Path,
+    kind: AssetKind,
+) -> (PathBuf, String, &'static [&'static str]) {
+    match kind {
+        AssetKind::Lora => (
+            comfyui_path.join("models").join("loras"),
+            "LoRA".to_string(),
+            &["safetensors", "pt", "ckpt", "bin"],
+        ),
+        AssetKind::Gguf => (
+            comfyui_path.join("models").join("diffusion_models"),
+            "GGUF".to_string(),
+            &["gguf"],
+        ),
+    }
+}
+
+fn asset_validation(
+    kind: String,
+    source_path: String,
+    target_dir: PathBuf,
+    target_path: PathBuf,
+    file_name: String,
+    status: &str,
+    message: &str,
+    can_install: bool,
+    target_dir_exists: bool,
+) -> AssetInstallValidation {
+    AssetInstallValidation {
+        kind,
+        source_path,
+        target_dir: path_text(&target_dir),
+        target_path: path_text(&target_path),
+        file_name,
+        status: status.to_string(),
+        message: message.to_string(),
+        can_install,
+        target_dir_exists,
+        will_create_target_dir: can_install && !target_dir_exists,
+    }
+}
+
+fn extension_error_message(kind: AssetKind) -> &'static str {
+    match kind {
+        AssetKind::Lora => "LoRA musi mieć rozszerzenie .safetensors, .pt, .ckpt albo .bin.",
+        AssetKind::Gguf => "Model GGUF musi mieć rozszerzenie .gguf.",
+    }
+}
+
 fn comfyui_candidates() -> Vec<PathBuf> {
     let mut candidates = Vec::new();
 
@@ -661,6 +911,116 @@ mod tests {
         assert_eq!(report.counts.gguf_files, 1);
 
         fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn validates_lora_file_for_loras_folder() {
+        let root = temp_comfyui("valid-lora");
+        let source = root.join("incoming-style.safetensors");
+        fs::write(&source, "lora").expect("write lora");
+
+        let validation = validate_asset_install_paths(root.clone(), source, AssetKind::Lora);
+
+        assert!(validation.can_install);
+        assert_eq!(validation.kind, "LoRA");
+        assert_eq!(validation.file_name, "incoming-style.safetensors");
+        assert!(validation
+            .target_path
+            .ends_with("models\\loras\\incoming-style.safetensors"));
+
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn rejects_text_file_as_lora() {
+        let root = temp_comfyui("invalid-lora");
+        let source = root.join("notes.txt");
+        fs::write(&source, "not a lora").expect("write txt");
+
+        let validation = validate_asset_install_paths(root.clone(), source, AssetKind::Lora);
+
+        assert!(!validation.can_install);
+        assert_eq!(validation.status, "błąd");
+
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn validates_gguf_file_for_diffusion_models_folder() {
+        let root = temp_comfyui("valid-gguf");
+        let source = root.join("flux.gguf");
+        fs::write(&source, "gguf").expect("write gguf");
+
+        let validation = validate_asset_install_paths(root.clone(), source, AssetKind::Gguf);
+
+        assert!(validation.can_install);
+        assert_eq!(validation.kind, "GGUF");
+        assert!(validation
+            .target_path
+            .ends_with("models\\diffusion_models\\flux.gguf"));
+
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn rejects_duplicate_target_file() {
+        let root = temp_comfyui("duplicate");
+        let source = root.join("style.safetensors");
+        let target_dir = root.join("models").join("loras");
+        fs::create_dir_all(&target_dir).expect("create loras folder");
+        fs::write(&source, "new lora").expect("write source");
+        fs::write(target_dir.join("style.safetensors"), "old lora").expect("write duplicate");
+
+        let validation = validate_asset_install_paths(root.clone(), source, AssetKind::Lora);
+
+        assert!(!validation.can_install);
+        assert!(validation.message.contains("nie nadpisuje"));
+
+        fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn install_lora_creates_missing_folder_and_copies_file() {
+        let root = temp_comfyui("install-lora");
+        let source_dir = temp_dir("asset-source");
+        fs::create_dir_all(&source_dir).expect("create source dir");
+        let source = source_dir.join("fresh.safetensors");
+        fs::write(&source, "fresh lora").expect("write source");
+
+        let result = install_asset(path_text(&root), path_text(&source), AssetKind::Lora);
+        let copied = root.join("models").join("loras").join("fresh.safetensors");
+
+        assert!(result.success);
+        assert!(copied.is_file());
+        assert_eq!(
+            fs::read_to_string(copied).expect("read copied"),
+            "fresh lora"
+        );
+
+        fs::remove_dir_all(root).ok();
+        fs::remove_dir_all(source_dir).ok();
+    }
+
+    #[test]
+    fn install_gguf_rejects_non_gguf_file() {
+        let root = temp_comfyui("install-invalid-gguf");
+        let source = root.join("flux.txt");
+        fs::write(&source, "not gguf").expect("write source");
+
+        let result = install_asset(path_text(&root), path_text(&source), AssetKind::Gguf);
+
+        assert!(!result.success);
+        assert!(result.message.contains(".gguf"));
+
+        fs::remove_dir_all(root).ok();
+    }
+
+    fn temp_comfyui(name: &str) -> PathBuf {
+        let root = temp_dir(name);
+        fs::create_dir_all(root.join("models")).expect("create models folder");
+        fs::create_dir_all(root.join("custom_nodes")).expect("create custom nodes folder");
+        fs::write(root.join("main.py"), "").expect("write main.py");
+        root
     }
 
     fn temp_dir(name: &str) -> PathBuf {

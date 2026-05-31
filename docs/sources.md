@@ -29,3 +29,11 @@ W etapie 2 dodaliśmy oficjalny `@tauri-apps/plugin-dialog` oraz `tauri-plugin-d
 Ta paczka jest potrzebna do jednego zadania: otwarcia systemowego okna wyboru folderu. Dzięki temu użytkownik nie musi ręcznie wpisywać ścieżki do ComfyUI.
 
 Nie jest to biblioteka UI i nie zmienia wyglądu aplikacji. To małe narzędzie do bezpiecznego wyboru folderu.
+
+## Decyzja z etapu 3
+
+LoRA zapisujemy w `ComfyUI/models/loras`.
+
+Pliki GGUF dla bazowego modelu diffusion zapisujemy w `ComfyUI/models/diffusion_models`.
+
+Ta decyzja utrzymuje porządek w folderze `models` i pasuje do kierunku workflow FLUX.

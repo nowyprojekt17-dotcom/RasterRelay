@@ -11,6 +11,7 @@ Pierwszy etap nie buduje jeszcze całej wtyczki. Zaczynamy od małego Launchera,
 - wykrywanie folderu ComfyUI,
 - ręczne wskazanie folderu ComfyUI, jeśli autoskan go nie znajdzie,
 - widoczna sekcja LoRA od samego początku,
+- bezpieczne dodawanie plików LoRA i GGUF,
 - miejsce na przyszły workflow inpaintingu,
 - miejsce na przyszłe custom nodes RasterRelay.
 
@@ -49,3 +50,13 @@ npm run dev
 ## Ważna zasada
 
 LoRA nie są dodatkiem doklejonym później. RasterRelay od początku traktuje LoRA jako ważną część systemu generowania.
+
+## Etap 3
+
+Launcher potrafi już bezpiecznie dodać plik LoRA albo GGUF:
+
+- LoRA trafia do `ComfyUI/models/loras`.
+- GGUF trafia do `ComfyUI/models/diffusion_models`.
+- Launcher najpierw sprawdza plik i pokazuje panel potwierdzenia.
+- Launcher nie nadpisuje istniejących plików.
+- Text encoders, custom nodes, workflow i Photoshop nadal czekają na kolejne etapy.

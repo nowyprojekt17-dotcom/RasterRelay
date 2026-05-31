@@ -29,6 +29,27 @@ type ReadinessReport = {
   scannedPaths: string[];
 };
 
+type AssetKind = "lora" | "gguf";
+
+type AssetInstallValidation = {
+  kind: string;
+  sourcePath: string;
+  targetDir: string;
+  targetPath: string;
+  fileName: string;
+  status: ReadinessStatus;
+  message: string;
+  canInstall: boolean;
+  targetDirExists: boolean;
+  willCreateTargetDir: boolean;
+};
+
+type AssetInstallResult = {
+  success: boolean;
+  destinationPath?: string | null;
+  message: string;
+};
+
 const savedComfyuiPathKey = "rasterrelay.comfyuiPath";
 
 const statusClass: Record<ReadinessStatus, string> = {
@@ -73,11 +94,15 @@ function browserFallbackReport(): ReadinessReport {
 function App() {
   const [report, setReport] = useState<ReadinessReport | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isInstalling, setIsInstalling] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [pendingInstall, setPendingInstall] = useState<AssetInstallValidation | null>(null);
 
-  async function loadReadiness() {
+  async function loadReadiness(clearNotice = true) {
     setIsLoading(true);
-    setNotice(null);
+    if (clearNotice) {
+      setNotice(null);
+    }
 
     const savedPath = localStorage.getItem(savedComfyuiPathKey);
 
@@ -151,9 +176,91 @@ function App() {
   const hasSavedPath = Boolean(localStorage.getItem(savedComfyuiPathKey));
   const readinessItems = report?.items ?? [];
 
+  async function startAssetInstall(kind: AssetKind) {
+    if (!report?.comfyuiPath) {
+      setNotice("Najpierw wybierz poprawny folder ComfyUI.");
+      return;
+    }
+
+    setNotice(null);
+
+    try {
+      const selected = await open({
+        multiple: false,
+        title: kind === "lora" ? "Wybierz plik LoRA" : "Wybierz plik GGUF",
+        filters: [
+          kind === "lora"
+            ? {
+                name: "LoRA",
+                extensions: ["safetensors", "pt", "ckpt", "bin"]
+              }
+            : {
+                name: "GGUF",
+                extensions: ["gguf"]
+              }
+        ]
+      });
+
+      if (!selected || Array.isArray(selected)) {
+        setNotice("Nie wybrano pliku. Nic nie zostało zmienione.");
+        return;
+      }
+
+      const validation = await invoke<AssetInstallValidation>("validate_asset_install", {
+        comfyuiPath: report.comfyuiPath,
+        sourcePath: selected,
+        kind
+      });
+
+      setPendingInstall(validation);
+    } catch {
+      setNotice("Wybór pliku działa tylko w oknie Tauri, nie w zwykłej przeglądarce.");
+    }
+  }
+
+  async function confirmAssetInstall() {
+    if (!pendingInstall || !report?.comfyuiPath) {
+      return;
+    }
+
+    setIsInstalling(true);
+    setNotice(null);
+
+    try {
+      const kind: AssetKind = pendingInstall.kind === "LoRA" ? "lora" : "gguf";
+      const result = await invoke<AssetInstallResult>("install_asset", {
+        comfyuiPath: report.comfyuiPath,
+        sourcePath: pendingInstall.sourcePath,
+        kind
+      });
+
+      if (result.success) {
+        setPendingInstall(null);
+        await loadReadiness(false);
+        setNotice(result.message);
+      } else {
+        setNotice(result.message);
+      }
+    } catch {
+      setNotice("Nie udało się skopiować pliku. Sprawdź, czy plik nadal istnieje.");
+    } finally {
+      setIsInstalling(false);
+    }
+  }
+
   function showPlaceholder(actionLabel: string, label: string) {
     if (label === "Folder ComfyUI" || actionLabel === "Wybierz ponownie") {
       void chooseComfyuiFolder();
+      return;
+    }
+
+    if (label === "LoRA") {
+      void startAssetInstall("lora");
+      return;
+    }
+
+    if (label === "Modele" || label === "Diffusion models") {
+      void startAssetInstall("gguf");
       return;
     }
 
@@ -173,7 +280,7 @@ function App() {
           </div>
         </div>
         <div className="topbar-actions">
-          <button className="primary-button" onClick={loadReadiness} disabled={isLoading}>
+          <button className="primary-button" onClick={() => void loadReadiness()} disabled={isLoading}>
             {isLoading ? "Skanuję..." : "Odśwież"}
           </button>
           <button className="secondary-button" onClick={chooseComfyuiFolder} disabled={isLoading}>
@@ -202,6 +309,59 @@ function App() {
       </section>
 
       {notice ? <div className="notice">{notice}</div> : null}
+
+      {pendingInstall ? (
+        <section className="install-panel" aria-label="Potwierdź dodanie pliku">
+          <div>
+            <p className="eyebrow">Potwierdź dodanie pliku</p>
+            <h2>{pendingInstall.kind}</h2>
+            <p>{pendingInstall.message}</p>
+          </div>
+          <StatusBadge status={pendingInstall.status} />
+          <dl className="install-details">
+            <div>
+              <dt>Plik</dt>
+              <dd>{pendingInstall.fileName}</dd>
+            </div>
+            <div>
+              <dt>Źródło</dt>
+              <dd>
+                <code>{pendingInstall.sourcePath}</code>
+              </dd>
+            </div>
+            <div>
+              <dt>Folder docelowy</dt>
+              <dd>
+                <code>{pendingInstall.targetDir}</code>
+              </dd>
+            </div>
+            <div>
+              <dt>Efekt</dt>
+              <dd>
+                {pendingInstall.willCreateTargetDir
+                  ? "Launcher utworzy brakujący folder i skopiuje plik."
+                  : "Launcher skopiuje plik do istniejącego folderu."}
+              </dd>
+            </div>
+          </dl>
+          <div className="install-actions">
+            <button
+              className="primary-button"
+              disabled={!pendingInstall.canInstall || isInstalling}
+              onClick={confirmAssetInstall}
+            >
+              {isInstalling ? "Kopiuję..." : "Kopiuj"}
+            </button>
+            <button
+              className="ghost-button"
+              disabled={isInstalling}
+              onClick={() => setPendingInstall(null)}
+            >
+              Anuluj
+            </button>
+          </div>
+        </section>
+      ) : null}
 
       {!report?.comfyuiPath ? (
         <section className="guidance-panel" aria-label="Instrukcja wyboru ComfyUI">
@@ -276,7 +436,7 @@ function App() {
       </section>
 
       <footer className="footer-note">
-        Etap 2: autoskan plus ręczny wybór folderu ComfyUI. Nadal bez kopiowania plików i bez workflow.
+        Etap 3: bezpieczne dodawanie LoRA i GGUF. Workflow i Photoshop nadal czekają na kolejne etapy.
       </footer>
     </main>
   );

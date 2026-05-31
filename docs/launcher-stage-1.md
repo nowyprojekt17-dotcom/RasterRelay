@@ -1,4 +1,4 @@
-# Launcher - etap 1 i 2
+# Launcher - etap 1, 2 i 3
 
 Launcher jest małą aplikacją pomocniczą dla RasterRelay.
 
@@ -27,6 +27,19 @@ Jeżeli autoskan nie znajdzie ComfyUI, użytkownik może kliknąć `Wybierz fold
 
 Jeżeli go nie ma, Launcher pokaże prosty komunikat, że to nie jest główny folder ComfyUI.
 
+## Co dodaje etap 3
+
+Etap 3 dodaje bezpieczne dodawanie dwóch typów plików:
+
+- LoRA do `models/loras`,
+- GGUF do `models/diffusion_models`.
+
+Launcher nie kopiuje pliku od razu po wyborze. Najpierw sprawdza rozszerzenie, folder docelowy i duplikaty, a potem pokazuje panel potwierdzenia.
+
+Jeśli folder docelowy nie istnieje, Launcher tworzy go dopiero po kliknięciu `Kopiuj`.
+
+Jeśli plik o tej samej nazwie już istnieje, Launcher odmawia kopiowania i niczego nie nadpisuje.
+
 ## Czego Launcher jeszcze nie robi
 
 - nie instaluje ComfyUI,
@@ -35,4 +48,4 @@ Jeżeli go nie ma, Launcher pokaże prosty komunikat, że to nie jest główny f
 - nie uruchamia workflow,
 - nie łączy się jeszcze z Photoshopem.
 
-Przyciski Add i Install są w pierwszym etapie tylko szkicem. Pokazują użytkownikowi, gdzie taka funkcja będzie, ale nie zmieniają plików na dysku.
+Przyciski Add dla LoRA i GGUF działają od etapu 3. Pozostałe przyciski Add i Install nadal są szkicem.
