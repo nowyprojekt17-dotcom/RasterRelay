@@ -10,6 +10,7 @@ const COMFY_HISTORY_POLL_MS = 2000;
 const DEFAULT_MASK_FEATHER_RATIO = 0.015;
 const DEFAULT_MASK_FEATHER_MIN_PX = 8;
 const DEFAULT_MASK_FEATHER_MAX_PX = 32;
+const SELECTION_PADDING_PX = 96;
 const qualityPresets = {
   fast: {
     label: "Szybki test",
@@ -276,6 +277,22 @@ function getSelectionInfo(document) {
   };
 }
 
+function calculatePaddedBounds(selectionBounds, docWidth, docHeight, padding) {
+  const left = Math.max(0, Math.round(selectionBounds.left) - padding);
+  const top = Math.max(0, Math.round(selectionBounds.top) - padding);
+  const right = Math.min(docWidth, Math.round(selectionBounds.right) + padding);
+  const bottom = Math.min(docHeight, Math.round(selectionBounds.bottom) + padding);
+
+  return {
+    left,
+    top,
+    right,
+    bottom,
+    width: right - left,
+    height: bottom - top
+  };
+}
+
 async function checkDocument() {
   const summary = getActiveDocumentSummary();
   setMessage(summary.message);
@@ -398,6 +415,7 @@ function buildInpaintingJob(document, prompt, assets) {
       bounds: selection.bounds,
       solid: selection.solid
     },
+    cropBounds: assets.cropBounds || null,
     assets,
     generation: {
       tool: "inpainting-brush",
@@ -478,6 +496,69 @@ async function exportDocumentPng(document, dataFolder, filePrefix) {
     },
     file
   };
+}
+
+async function exportCroppedSourcePng(document, dataFolder, filePrefix, paddedBounds) {
+  const photoshop = getPhotoshopApi();
+  if (!photoshop?.imaging) {
+    return exportDocumentPng(document, dataFolder, filePrefix);
+  }
+
+  const docSize = readDocumentSize(document);
+  const image = await photoshop.imaging.getImage({
+    documentID: document.id,
+    sourceBounds: {
+      left: paddedBounds.left,
+      top: paddedBounds.top,
+      right: paddedBounds.right,
+      bottom: paddedBounds.bottom
+    }
+  });
+
+  try {
+    const pixelData = await image.imageData.getData();
+    const width = paddedBounds.width;
+    const height = paddedBounds.height;
+
+    const rgbaPixels = new Uint8Array(width * height * 4);
+    const components = Math.max(1, Math.round(pixelData.length / (width * height)));
+
+    for (let i = 0; i < width * height; i++) {
+      const srcIdx = i * components;
+      const dstIdx = i * 4;
+
+      if (components >= 3) {
+        rgbaPixels[dstIdx] = pixelData[srcIdx];
+        rgbaPixels[dstIdx + 1] = pixelData[srcIdx + 1];
+        rgbaPixels[dstIdx + 2] = pixelData[srcIdx + 2];
+        rgbaPixels[dstIdx + 3] = components >= 4 ? pixelData[srcIdx + 3] : 255;
+      } else {
+        const val = pixelData[srcIdx];
+        rgbaPixels[dstIdx] = val;
+        rgbaPixels[dstIdx + 1] = val;
+        rgbaPixels[dstIdx + 2] = val;
+        rgbaPixels[dstIdx + 3] = 255;
+      }
+    }
+
+    const file = await dataFolder.createFile(`${filePrefix}-source.png`, {
+      overwrite: true
+    });
+    const pngBuffer = encodePngRgba(width, height, rgbaPixels);
+    await file.write(pngBuffer);
+
+    return {
+      asset: {
+        kind: "sourceImage",
+        format: "png",
+        path: file.nativePath || file.name,
+        cropBounds: paddedBounds
+      },
+      file
+    };
+  } finally {
+    image.imageData?.dispose?.();
+  }
 }
 
 const pngCrcTable = (() => {
@@ -803,7 +884,7 @@ function createSoftMaskChannelFromSelection(selectionImage, pixelData, radius) {
   return blurMaskVertical(horizontal, size.width, size.height, radius);
 }
 
-async function exportExactSelectionMaskPng(photoshopDocument, dataFolder, filePrefix) {
+async function exportExactSelectionMaskPng(photoshopDocument, dataFolder, filePrefix, paddedBounds) {
   const photoshop = getPhotoshopApi();
   if (!photoshop?.imaging) {
     throw new Error("Photoshop Imaging API is unavailable.");
@@ -817,17 +898,52 @@ async function exportExactSelectionMaskPng(photoshopDocument, dataFolder, filePr
 
   try {
     const pixelData = await selectionImage.imageData.getData();
-    const mask = createBoundsMaskPixels(photoshopDocument, {
-      ...selection,
-      bounds: { left: 0, top: 0, right: 0, bottom: 0 }
-    });
-    putSelectionPixelsOnMask(mask, selectionImage, pixelData);
-    const featherRadius = softenMaskPixels(mask);
+    const width = paddedBounds.width;
+    const height = paddedBounds.height;
+    const pixels = new Uint8Array(width * height * 4);
+
+    const selBounds = selectionImage.sourceBounds || selection.bounds;
+    const selLeft = Math.round(selBounds.left);
+    const selTop = Math.round(selBounds.top);
+    const selWidth = Math.round(selBounds.right - selBounds.left);
+    const selHeight = Math.round(selBounds.bottom - selBounds.top);
+    const components = Math.max(1, Math.round(pixelData.length / (selWidth * selHeight)));
+
+    for (let y = 0; y < selHeight; y++) {
+      for (let x = 0; x < selWidth; x++) {
+        const srcIdx = (y * selWidth + x) * components;
+        const docX = selLeft + x;
+        const docY = selTop + y;
+        const cropX = docX - paddedBounds.left;
+        const cropY = docY - paddedBounds.top;
+
+        if (cropX < 0 || cropY < 0 || cropX >= width || cropY >= height) {
+          continue;
+        }
+
+        let maskValue;
+        if (components === 1) {
+          maskValue = pixelData[srcIdx];
+        } else if (components === 4) {
+          maskValue = pixelData[srcIdx + 3];
+        } else {
+          maskValue = pixelData[srcIdx];
+        }
+
+        const dstIdx = (cropY * width + cropX) * 4;
+        pixels[dstIdx] = maskValue;
+        pixels[dstIdx + 1] = maskValue;
+        pixels[dstIdx + 2] = maskValue;
+        pixels[dstIdx + 3] = 255;
+      }
+    }
+
+    const featherRadius = softenMaskPixels({ width, height, pixels });
 
     const file = await dataFolder.createFile(`${filePrefix}-mask-selection.png`, {
       overwrite: true
     });
-    const pngBuffer = encodePngRgba(mask.width, mask.height, mask.pixels);
+    const pngBuffer = encodePngRgba(width, height, pixels);
     await file.write(pngBuffer);
 
     return {
@@ -836,7 +952,7 @@ async function exportExactSelectionMaskPng(photoshopDocument, dataFolder, filePr
         format: "png",
         path: file.nativePath || file.name,
         mode: "photoshop-selection-pixels",
-        sourceBounds: selectionImage.sourceBounds,
+        cropBounds: paddedBounds,
         featherRadius,
         note:
           "Maska została utworzona z pikselowej reprezentacji zaznaczenia Photoshopa i ma miękką krawędź."
@@ -848,14 +964,34 @@ async function exportExactSelectionMaskPng(photoshopDocument, dataFolder, filePr
   }
 }
 
-async function exportBoundsMaskPng(photoshopDocument, dataFolder, filePrefix) {
+async function exportBoundsMaskPng(photoshopDocument, dataFolder, filePrefix, paddedBounds) {
   const selection = getSelectionInfo(photoshopDocument);
   const file = await dataFolder.createFile(`${filePrefix}-mask-bounds.png`, {
     overwrite: true
   });
-  const mask = createBoundsMaskPixels(photoshopDocument, selection);
-  const featherRadius = softenMaskPixels(mask);
-  const pngBuffer = encodePngRgba(mask.width, mask.height, mask.pixels);
+
+  const width = paddedBounds.width;
+  const height = paddedBounds.height;
+  const pixels = new Uint8Array(width * height * 4);
+
+  const selBounds = selection.bounds;
+  const selLeft = Math.max(0, Math.round(selBounds.left) - paddedBounds.left);
+  const selTop = Math.max(0, Math.round(selBounds.top) - paddedBounds.top);
+  const selRight = Math.min(width, Math.round(selBounds.right) - paddedBounds.left);
+  const selBottom = Math.min(height, Math.round(selBounds.bottom) - paddedBounds.top);
+
+  for (let y = selTop; y < selBottom; y++) {
+    for (let x = selLeft; x < selRight; x++) {
+      const idx = (y * width + x) * 4;
+      pixels[idx] = 255;
+      pixels[idx + 1] = 255;
+      pixels[idx + 2] = 255;
+      pixels[idx + 3] = 255;
+    }
+  }
+
+  const featherRadius = softenMaskPixels({ width, height, pixels });
+  const pngBuffer = encodePngRgba(width, height, pixels);
 
   await file.write(pngBuffer);
 
@@ -865,6 +1001,7 @@ async function exportBoundsMaskPng(photoshopDocument, dataFolder, filePrefix) {
       format: "png",
       path: file.nativePath || file.name,
       mode: selection.solid ? "solid-selection-bounds" : "selection-bounds-preview",
+      cropBounds: paddedBounds,
       featherRadius,
       note:
         "Awaryjna maska używa granic zaznaczenia i dodaje miękką krawędź. Nieregularna selekcja nadal jest lepsza od prostego prostokąta."
@@ -875,20 +1012,31 @@ async function exportBoundsMaskPng(photoshopDocument, dataFolder, filePrefix) {
 
 async function exportInpaintingAssets(document, dataFolder) {
   const filePrefix = `rasterrelay-${createSafeTimestamp()}`;
-  const sourceImageExport = await exportDocumentPng(document, dataFolder, filePrefix);
+  const docSize = readDocumentSize(document);
+  const selection = getSelectionInfo(document);
+
+  const paddedBounds = calculatePaddedBounds(
+    selection.bounds,
+    docSize.width,
+    docSize.height,
+    SELECTION_PADDING_PX
+  );
+
+  const sourceImageExport = await exportCroppedSourcePng(document, dataFolder, filePrefix, paddedBounds);
   let selectionMask;
 
   try {
-    selectionMask = await exportExactSelectionMaskPng(document, dataFolder, filePrefix);
+    selectionMask = await exportExactSelectionMaskPng(document, dataFolder, filePrefix, paddedBounds);
   } catch (error) {
-    selectionMask = await exportBoundsMaskPng(document, dataFolder, filePrefix);
+    selectionMask = await exportBoundsMaskPng(document, dataFolder, filePrefix, paddedBounds);
     selectionMask.asset.fallbackReason = error.message || String(error);
   }
 
   return {
     assets: {
       sourceImage: sourceImageExport.asset,
-      selectionMask: selectionMask.asset
+      selectionMask: selectionMask.asset,
+      cropBounds: paddedBounds
     },
     files: {
       sourceImage: sourceImageExport.file,
@@ -1336,7 +1484,7 @@ async function downloadComfyImage(image, dataFolder) {
   };
 }
 
-async function placeImageFileAsLayer(file) {
+async function placeImageFileAsLayer(file, cropBounds) {
   const photoshop = getPhotoshopApi();
   const uxp = getUxpApi();
 
@@ -1352,6 +1500,9 @@ async function placeImageFileAsLayer(file) {
       source: "active-selection"
     }
   };
+
+  const offsetX = cropBounds ? cropBounds.left : 0;
+  const offsetY = cropBounds ? cropBounds.top : 0;
 
   await photoshop.core.executeAsModal(
     async () => {
@@ -1376,11 +1527,11 @@ async function placeImageFileAsLayer(file) {
               _obj: "offset",
               horizontal: {
                 _unit: "pixelsUnit",
-                _value: 0
+                _value: offsetX
               },
               vertical: {
                 _unit: "pixelsUnit",
-                _value: 0
+                _value: offsetY
               }
             }
           }
@@ -1442,13 +1593,25 @@ async function captureSoftSelectionMaskForLayer(photoshop) {
   try {
     const size = getImageDataSize(selectionImage);
     const selectionPixels = await selectionImage.imageData.getData();
-    const featherRadius = getDefaultMaskFeatherRadius(size.width, size.height);
-    const softMaskPixels = createSoftMaskChannelFromSelection(
-      selectionImage,
-      selectionPixels,
-      featherRadius
-    );
-    const imageData = await photoshop.imaging.createImageDataFromBuffer(softMaskPixels, {
+    const components = Math.max(1, Math.round(selectionPixels.length / (size.width * size.height)));
+    const hardMaskPixels = new Uint8Array(size.width * size.height);
+
+    for (let i = 0; i < size.width * size.height; i++) {
+      const srcIdx = i * components;
+      let maskValue;
+
+      if (components === 1) {
+        maskValue = selectionPixels[srcIdx];
+      } else if (components === 4) {
+        maskValue = selectionPixels[srcIdx + 3];
+      } else {
+        maskValue = selectionPixels[srcIdx];
+      }
+
+      hardMaskPixels[i] = maskValue;
+    }
+
+    const imageData = await photoshop.imaging.createImageDataFromBuffer(hardMaskPixels, {
       width: size.width,
       height: size.height,
       components: 1,
@@ -1460,9 +1623,9 @@ async function captureSoftSelectionMaskForLayer(photoshop) {
     return {
       captured: true,
       source: "active-selection-before-place",
-      mode: "photoshop-selection-pixels",
+      mode: "photoshop-selection-pixels-hard",
       imageData,
-      featherRadius,
+      featherRadius: 0,
       targetBounds: {
         left: Math.round(selectionImage.sourceBounds?.left ?? selection.bounds.left),
         top: Math.round(selectionImage.sourceBounds?.top ?? selection.bounds.top)
@@ -1553,7 +1716,7 @@ async function applySelectionMaskToActiveLayer(photoshop, layerId) {
   }
 
   let selectionImage = null;
-  let softMaskImageData = null;
+  let hardMaskImageData = null;
 
   try {
     selectionImage = await photoshop.imaging.getSelection({
@@ -1562,13 +1725,25 @@ async function applySelectionMaskToActiveLayer(photoshop, layerId) {
     });
     const size = getImageDataSize(selectionImage);
     const selectionPixels = await selectionImage.imageData.getData();
-    const featherRadius = getDefaultMaskFeatherRadius(size.width, size.height);
-    const softMaskPixels = createSoftMaskChannelFromSelection(
-      selectionImage,
-      selectionPixels,
-      featherRadius
-    );
-    softMaskImageData = await photoshop.imaging.createImageDataFromBuffer(softMaskPixels, {
+    const components = Math.max(1, Math.round(selectionPixels.length / (size.width * size.height)));
+    const hardMaskPixels = new Uint8Array(size.width * size.height);
+
+    for (let i = 0; i < size.width * size.height; i++) {
+      const srcIdx = i * components;
+      let maskValue;
+
+      if (components === 1) {
+        maskValue = selectionPixels[srcIdx];
+      } else if (components === 4) {
+        maskValue = selectionPixels[srcIdx + 3];
+      } else {
+        maskValue = selectionPixels[srcIdx];
+      }
+
+      hardMaskPixels[i] = maskValue;
+    }
+
+    hardMaskImageData = await photoshop.imaging.createImageDataFromBuffer(hardMaskPixels, {
       width: size.width,
       height: size.height,
       components: 1,
@@ -1581,7 +1756,7 @@ async function applySelectionMaskToActiveLayer(photoshop, layerId) {
       documentID: document.id,
       layerID: layerId,
       kind: "user",
-      imageData: softMaskImageData,
+      imageData: hardMaskImageData,
       replace: true,
       targetBounds: {
         left: Math.round(selectionImage.sourceBounds?.left ?? selection.bounds.left),
@@ -1593,8 +1768,8 @@ async function applySelectionMaskToActiveLayer(photoshop, layerId) {
     return {
       applied: true,
       source: "active-selection",
-      mode: "photoshop-selection-pixels",
-      featherRadius,
+      mode: "photoshop-selection-pixels-hard",
+      featherRadius: 0,
       targetBounds: selectionImage.sourceBounds || selection.bounds
     };
   } catch (error) {
@@ -1605,17 +1780,17 @@ async function applySelectionMaskToActiveLayer(photoshop, layerId) {
       error: error.message || String(error)
     };
   } finally {
-    softMaskImageData?.dispose?.();
+    hardMaskImageData?.dispose?.();
     selectionImage?.imageData?.dispose?.();
   }
 }
 
-async function receiveComfyResult(promptId, dataFolder) {
+async function receiveComfyResult(promptId, dataFolder, cropBounds) {
   const output = await waitForComfyOutput(promptId);
   const downloaded = await downloadComfyImage(output.image, dataFolder);
 
   try {
-    const placement = await placeImageFileAsLayer(downloaded.file);
+    const placement = await placeImageFileAsLayer(downloaded.file, cropBounds);
     downloaded.asset.photoshop = {
       placedAsLayer: true,
       layerMode: placement.layerMode,
@@ -1696,7 +1871,8 @@ async function prepareInpaintingEdit() {
 
     const resultAsset = await receiveComfyResult(
       queuedWorkflow.promptId,
-      packageResult.dataFolder
+      packageResult.dataFolder,
+      packageResult.job.cropBounds
     );
     packageResult.job.outputs.resultImage = resultAsset;
     const maskApplied = Boolean(resultAsset.photoshop?.layerMask?.applied);
