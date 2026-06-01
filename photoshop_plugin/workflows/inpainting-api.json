@@ -13,6 +13,13 @@
       "upload": "image"
     }
   },
+  "12": {
+    "class_type": "ImageToMask",
+    "inputs": {
+      "image": ["11", 0],
+      "channel": "red"
+    }
+  },
   "20": {
     "class_type": "UnetLoaderGGUF",
     "inputs": {
@@ -32,7 +39,7 @@
   "30": {
     "class_type": "DualCLIPLoader",
     "inputs": {
-      "clip_name1": "t5xxl_fp16.safetensors",
+      "clip_name1": "t5xxl_fp8_e4m3fn.safetensors",
       "clip_name2": "qwen_3_8b_fp8mixed.safetensors",
       "type": "flux"
     }
@@ -68,7 +75,7 @@
     "class_type": "SetLatentNoiseMask",
     "inputs": {
       "samples": ["41", 0],
-      "mask": ["11", 0]
+      "mask": ["12", 0]
     }
   },
   "50": {
@@ -131,7 +138,7 @@
     "inputs": {
       "destination": ["10", 0],
       "source": ["65", 0],
-      "mask": ["11", 0],
+      "mask": ["12", 0],
       "x": 0,
       "y": 0,
       "resize_source": false
