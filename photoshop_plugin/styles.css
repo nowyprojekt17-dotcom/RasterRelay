@@ -1,0 +1,216 @@
+:root {
+  color: #f2f7ff;
+  background: #191b22;
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 13px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #191b22;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  min-height: 34px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 6px;
+  padding: 0 12px;
+  color: #eef6ff;
+  background: rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+}
+
+button:hover {
+  background: rgba(255, 255, 255, 0.13);
+}
+
+button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+textarea,
+select,
+input {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 6px;
+  padding: 9px 10px;
+  color: #f2f7ff;
+  background: rgba(0, 0, 0, 0.28);
+}
+
+textarea {
+  resize: vertical;
+}
+
+label {
+  color: #ffffff;
+  font-weight: 700;
+}
+
+.rr-panel-shell {
+  min-width: 280px;
+  padding: 14px;
+}
+
+.rr-panel-header {
+  display: block;
+  margin-bottom: 12px;
+}
+
+.eyebrow,
+.rr-panel-title {
+  display: block;
+  clear: both;
+  width: 100%;
+  margin: 0;
+  color: #39d6ff;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.rr-panel-title,
+.rr-panel-subtitle,
+.rr-panel-header p {
+  display: block;
+  clear: both;
+  width: 100%;
+}
+
+h1,
+.rr-panel-subtitle {
+  margin: 0;
+  color: #ffffff;
+  font-size: 1.35rem;
+  line-height: 1.15;
+}
+
+.rr-panel-subtitle {
+  margin-top: 4px;
+  font-weight: 800;
+}
+
+.rr-panel-header p {
+  margin-top: 6px;
+}
+
+p {
+  margin: 0;
+  color: #b7c2d7;
+  line-height: 1.45;
+}
+
+.status-card,
+.form-section,
+.action-section,
+.log-card {
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  margin-bottom: 12px;
+}
+
+.status-card {
+  display: block;
+}
+
+.status-card div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  background: #ff7d8b;
+}
+
+.status-dot.ready {
+  background: #63dda1;
+}
+
+.form-section {
+  display: block;
+}
+
+.form-section label {
+  display: block;
+  margin: 10px 0 5px;
+}
+
+.lora-strength-grid {
+  display: block;
+}
+
+.lora-strength-grid div {
+  margin-top: 8px;
+}
+
+.lora-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-height: 22px;
+  color: #b7c2d7;
+  font-size: 0.86rem;
+}
+
+.lora-chip {
+  min-height: 28px;
+  max-width: 100%;
+  padding: 0 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hint {
+  font-size: 0.86rem;
+}
+
+.action-section {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.primary {
+  border: 0;
+  color: #071018;
+  background: linear-gradient(135deg, #34d9ff, #a57bff);
+  font-weight: 800;
+}
+
+.primary:hover {
+  background: linear-gradient(135deg, #6be5ff, #b99cff);
+}
+
+.dev-only {
+  display: none;
+}
+
+.rr-hidden-settings {
+  display: none;
+}
+
+.log-card {
+  min-height: 72px;
+  border-color: rgba(52, 217, 255, 0.2);
+  background: rgba(52, 217, 255, 0.07);
+}

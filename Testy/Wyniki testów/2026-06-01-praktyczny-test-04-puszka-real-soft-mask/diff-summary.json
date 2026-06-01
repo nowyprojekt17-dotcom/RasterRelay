@@ -1,0 +1,11 @@
+﻿{
+    "test":  "04-puszka-real-soft-mask",
+    "sample_step_px":  4,
+    "inside_mask_samples":  1144,
+    "soft_edge_samples":  742,
+    "outside_mask_samples":  63650,
+    "average_rgb_delta_inside_mask":  25.51,
+    "average_rgb_delta_soft_edge":  1.62,
+    "average_rgb_delta_outside_mask":  0,
+    "conclusion":  "Realna miekka maska: mocna zmiana w centrum, slabsza na krawedzi, zero zmiany poza maska."
+}

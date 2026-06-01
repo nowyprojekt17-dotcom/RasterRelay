@@ -39,7 +39,7 @@ button {
 }
 
 button:disabled {
-  cursor: wait;
+  cursor: not-allowed;
   opacity: 0.7;
 }
 
@@ -213,6 +213,181 @@ p {
   padding: 12px 14px;
   color: #ffe9aa;
   background: rgba(243, 202, 103, 0.1);
+}
+
+.runtime-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: start;
+  margin-bottom: 16px;
+  border: 1px solid rgba(52, 217, 255, 0.24);
+  border-radius: 8px;
+  padding: 18px;
+  background: rgba(52, 217, 255, 0.07);
+}
+
+.environment-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: start;
+  margin-bottom: 16px;
+  border: 1px solid rgba(99, 221, 161, 0.28);
+  border-radius: 8px;
+  padding: 18px;
+  background: rgba(99, 221, 161, 0.08);
+}
+
+.settings-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: start;
+  margin-bottom: 16px;
+  border: 1px solid rgba(52, 217, 255, 0.24);
+  border-radius: 8px;
+  padding: 18px;
+  background: rgba(52, 217, 255, 0.07);
+}
+
+.settings-summary {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.settings-summary div {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.settings-summary span {
+  color: #ffffff;
+  font-weight: 800;
+}
+
+.settings-summary p {
+  margin: 6px 0 0;
+  font-size: 0.9rem;
+}
+
+.environment-steps {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 10px;
+}
+
+.environment-steps div {
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 10px;
+}
+
+.environment-steps span {
+  color: #ffffff;
+  font-weight: 800;
+}
+
+.environment-steps p {
+  margin-bottom: 0;
+}
+
+.runtime-actions {
+  display: flex;
+  grid-column: 1 / -1;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.runtime-note {
+  grid-column: 1 / -1;
+  margin-bottom: 0;
+  font-size: 0.86rem;
+}
+
+.uxp-loader-box {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  padding-top: 14px;
+}
+
+.uxp-loader-box h3 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+}
+
+.uxp-loader-box p {
+  margin-bottom: 0;
+}
+
+.uxp-loader-box .runtime-actions,
+.uxp-loader-box .runtime-note {
+  grid-column: 1 / -1;
+}
+
+.workflow-panel,
+.photoshop-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: start;
+  margin-bottom: 16px;
+  border: 1px solid rgba(165, 123, 255, 0.24);
+  border-radius: 8px;
+  padding: 18px;
+  background: rgba(165, 123, 255, 0.07);
+}
+
+.photoshop-panel {
+  border-color: rgba(99, 221, 161, 0.24);
+  background: rgba(99, 221, 161, 0.07);
+}
+
+.workflow-details {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 10px;
+  margin: 0;
+}
+
+.workflow-details div,
+.workflow-inputs div {
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  padding-top: 10px;
+}
+
+.workflow-details dt,
+.workflow-inputs span {
+  color: #ffffff;
+  font-weight: 800;
+}
+
+.workflow-details dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.workflow-inputs {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 10px;
 }
 
 .install-panel {
@@ -453,6 +628,26 @@ p {
   }
 
   .guidance-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .runtime-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .environment-panel,
+  .settings-panel,
+  .environment-steps div {
+    grid-template-columns: 1fr;
+  }
+
+  .settings-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .workflow-panel,
+  .workflow-details div,
+  .workflow-inputs div {
     grid-template-columns: 1fr;
   }
 

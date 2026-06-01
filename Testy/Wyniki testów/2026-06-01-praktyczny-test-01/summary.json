@@ -1,0 +1,21 @@
+﻿{
+    "runId":  "2026-06-01-praktyczny-test-01",
+    "success":  true,
+    "promptId":  "ea20e713-49d8-4ae2-b577-82831a010a8c",
+    "source":  "C:\\Users\\Mierz\\Desktop\\RasterRelay\\testy\\Obrazy do testowania\\aa0d7431-a296-464e-9b88-a4ee2e9efc89.png",
+    "sourceCopy":  "C:\\Users\\Mierz\\Desktop\\RasterRelay\\testy\\Wyniki testów\\2026-06-01-praktyczny-test-01\\source.png",
+    "mask":  "C:\\Users\\Mierz\\Desktop\\RasterRelay\\testy\\Wyniki testów\\2026-06-01-praktyczny-test-01\\mask-center.png",
+    "result":  "C:\\Users\\Mierz\\Desktop\\RasterRelay\\testy\\Wyniki testów\\2026-06-01-praktyczny-test-01\\result.png",
+    "width":  1024,
+    "height":  1024,
+    "steps":  8,
+    "cfg":  4.2,
+    "startedAt":  "2026-06-01T13:17:09.0317086+02:00",
+    "finishedAt":  "2026-06-01T13:18:27.3211853+02:00",
+    "durationSeconds":  78.3,
+    "comfyOutput":  {
+                        "filename":  "inpainting_00003_.png",
+                        "subfolder":  "RasterRelay",
+                        "type":  "output"
+                    }
+}

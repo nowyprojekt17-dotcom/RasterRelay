@@ -1,0 +1,32 @@
+﻿{
+    "runId":  "2026-06-01-praktyczny-test-03-puszka-soft-mask",
+    "success":  true,
+    "promptId":  "8ae7eee6-f367-46c9-ab91-03c818b5399b",
+    "source":  "C:\\Users\\Mierz\\Desktop\\RasterRelay\\testy\\Obrazy do testowania\\aa0d7431-a296-464e-9b88-a4ee2e9efc89.png",
+    "sourceCopy":  "C:\\Users\\Mierz\\Desktop\\RasterRelay\\testy\\Wyniki testów\\2026-06-01-praktyczny-test-03-puszka-soft-mask\\source.png",
+    "mask":  "C:\\Users\\Mierz\\Desktop\\RasterRelay\\testy\\Wyniki testów\\2026-06-01-praktyczny-test-03-puszka-soft-mask\\mask-can-soft.png",
+    "result":  "C:\\Users\\Mierz\\Desktop\\RasterRelay\\testy\\Wyniki testów\\2026-06-01-praktyczny-test-03-puszka-soft-mask\\result.png",
+    "width":  1024,
+    "height":  1024,
+    "target":  "puszka w dłoni po prawej stronie obrazu",
+    "maskShape":  "soft ellipse",
+    "maskCenter":  {
+                       "y":  542,
+                       "x":  711
+                   },
+    "innerRadius":  {
+                        "y":  68,
+                        "x":  42
+                    },
+    "featherPixels":  36,
+    "steps":  14,
+    "cfg":  5,
+    "startedAt":  "2026-06-01T13:30:51.5396657+02:00",
+    "finishedAt":  "2026-06-01T13:32:30.7815131+02:00",
+    "durationSeconds":  99.2,
+    "comfyOutput":  {
+                        "filename":  "inpainting_00005_.png",
+                        "subfolder":  "RasterRelay",
+                        "type":  "output"
+                    }
+}

@@ -1,0 +1,11 @@
+
+const { pluginManager } = require("uxp");
+
+const plugins = Array.from(pluginManager.plugins || []);
+const rasterRelay = plugins.find((plugin) => plugin.id === "com.rasterrelay.photoshop");
+
+if (!rasterRelay) {
+  throw new Error("RasterRelay plugin is not loaded in Photoshop.");
+}
+
+await rasterRelay.invokeCommand("runE2ESmokeTest");

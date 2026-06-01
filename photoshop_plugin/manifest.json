@@ -1,0 +1,48 @@
+{
+  "manifestVersion": 5,
+  "id": "com.rasterrelay.photoshop",
+  "name": "RasterRelay",
+  "version": "0.1.5",
+  "main": "index.html",
+  "host": {
+    "app": "PS",
+    "minVersion": "27.8.0"
+  },
+  "entrypoints": [
+    {
+      "type": "panel",
+      "id": "rasterrelayPanel",
+      "label": {
+        "default": "RasterRelay"
+      },
+      "minimumSize": {
+        "width": 280,
+        "height": 320
+      },
+      "maximumSize": {
+        "width": 1200,
+        "height": 1200
+      },
+      "preferredDockedSize": {
+        "width": 320,
+        "height": 560
+      },
+      "preferredFloatingSize": {
+        "width": 360,
+        "height": 620
+      }
+    },
+    {
+      "type": "command",
+      "id": "runE2ESmokeTest",
+      "label": {
+        "default": "RasterRelay Test E2E"
+      }
+    }
+  ],
+  "requiredPermissions": {
+    "network": {
+      "domains": "all"
+    }
+  }
+}

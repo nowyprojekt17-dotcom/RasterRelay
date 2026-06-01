@@ -1,0 +1,57 @@
+{
+  "status": "draft",
+  "description": "Przykład mapowania. Po eksporcie prawdziwego workflow z ComfyUI ustaw status na ready i wpisz prawdziwe nodeId/inputName.",
+  "inputs": {
+    "sourceImage": {
+      "nodeId": "10",
+      "inputName": "image"
+    },
+    "selectionMask": {
+      "nodeId": "11",
+      "inputName": "image"
+    },
+    "prompt": {
+      "nodeId": "20",
+      "inputName": "text"
+    },
+    "steps": {
+      "nodeId": "62",
+      "inputName": "steps"
+    },
+    "cfg": {
+      "nodeId": "63",
+      "inputName": "cfg"
+    },
+    "loras": [
+      {
+        "name": {
+          "nodeId": "30",
+          "inputName": "lora_name"
+        },
+        "strengthModel": {
+          "nodeId": "30",
+          "inputName": "strength_model"
+        },
+        "strengthClip": {
+          "nodeId": "30",
+          "inputName": "strength_clip"
+        }
+      },
+      {
+        "name": {
+          "nodeId": "31",
+          "inputName": "lora_name"
+        },
+        "strengthModel": {
+          "nodeId": "31",
+          "inputName": "strength_model"
+        },
+        "strengthClip": {
+          "nodeId": "31",
+          "inputName": "strength_clip"
+        },
+        "emptyStrength": 0
+      }
+    ]
+  }
+}

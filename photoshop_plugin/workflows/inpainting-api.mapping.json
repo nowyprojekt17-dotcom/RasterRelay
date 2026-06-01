@@ -1,0 +1,58 @@
+{
+  "status": "ready",
+  "description": "RasterRelay Flux.2 Klein 9B GGUF image-edit workflow. Photoshop podstawia obraz, mask? i prompt. LoRA s? dodawane dynamicznie przez panel, gdy u?ytkownik wpisze nazwy LoRA.",
+  "inputs": {
+    "sourceImage": {
+      "nodeId": "10",
+      "inputName": "image"
+    },
+    "selectionMask": {
+      "nodeId": "11",
+      "inputName": "image"
+    },
+    "prompt": {
+      "nodeId": "31",
+      "inputName": "text"
+    },
+    "steps": {
+      "nodeId": "62",
+      "inputName": "steps"
+    },
+    "cfg": {
+      "nodeId": "63",
+      "inputName": "cfg"
+    }
+  },
+  "loraChain": {
+    "modelSource": {
+      "nodeId": "21",
+      "outputIndex": 0
+    },
+    "clipSource": {
+      "nodeId": "30",
+      "outputIndex": 0
+    },
+    "modelTargets": [
+      {
+        "nodeId": "63",
+        "inputName": "model"
+      }
+    ],
+    "clipTargets": [
+      {
+        "nodeId": "31",
+        "inputName": "clip"
+      },
+      {
+        "nodeId": "32",
+        "inputName": "clip"
+      }
+    ]
+  },
+  "notes": {
+    "baseModel": "flux-2-klein-9b-Q4_K_M.gguf",
+    "textEncoder": "qwen_3_8b_fp8mixed.safetensors",
+    "vae": "flux2-vae.safetensors",
+    "maskChannel": "red"
+  }
+}

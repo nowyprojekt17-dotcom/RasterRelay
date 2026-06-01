@@ -1,0 +1,18 @@
+﻿{
+    "test":  "04-puszka-real-soft-mask",
+    "prompt_id":  "a4d24f42-3e77-45c8-9b5f-756f42fab5f4",
+    "duration_seconds":  99.3,
+    "source":  "C:\\Users\\Mierz\\Desktop\\RasterRelay\\Testy\\Wyniki testów\\2026-06-01-praktyczny-test-04-puszka-real-soft-mask\\source.png",
+    "mask":  "C:\\Users\\Mierz\\Desktop\\RasterRelay\\Testy\\Wyniki testów\\2026-06-01-praktyczny-test-04-puszka-real-soft-mask\\mask-can-real-soft.png",
+    "result":  "C:\\Users\\Mierz\\Desktop\\RasterRelay\\Testy\\Wyniki testów\\2026-06-01-praktyczny-test-04-puszka-real-soft-mask\\result.png",
+    "mask_nonzero_levels":  255,
+    "mask_min_nonzero":  1,
+    "mask_max_nonzero":  255,
+    "mask_target":  {
+                        "radius_x":  42,
+                        "radius_y":  68,
+                        "center_y":  542,
+                        "center_x":  711,
+                        "feather_px":  36
+                    }
+}
