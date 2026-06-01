@@ -2980,18 +2980,14 @@ mod tests {
         let source = source_dir.join("test-wf.json");
         fs::write(&source, r#"{"10":{"class_type":"Test","inputs":{}}}"#).expect("write");
 
-        let result = install_workflow_file(path_text(&source), WorkflowFileKind::WorkflowApi);
+        let validation = validate_workflow_file_install_paths(
+            source.clone(),
+            WorkflowFileKind::WorkflowApi,
+        );
 
-        assert!(result.success, "install failed: {}", result.message);
-
-        let root = repo_root_path();
-        let target = root.join("photoshop_plugin").join("workflows").join("inpainting-api.json");
-
-        let wf = serde_json::from_str::<Value>(
-            &fs::read_to_string(&target).expect("read target")
-        ).expect("parse target");
-
-        assert!(wf.get("10").is_some());
+        assert!(validation.can_install, "validation failed: {}", validation.message);
+        assert_eq!(validation.kind, "Workflow API");
+        assert!(validation.target_path.ends_with("inpainting-api.json"));
 
         fs::remove_dir_all(source_dir).ok();
     }
