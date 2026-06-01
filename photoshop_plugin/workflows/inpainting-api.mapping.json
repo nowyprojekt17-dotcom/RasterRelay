@@ -1,6 +1,6 @@
 {
   "status": "ready",
-  "description": "RasterRelay Flux.2 Klein 9B GGUF image-edit workflow. Photoshop podstawia obraz, mask? i prompt. LoRA s? dodawane dynamicznie przez panel, gdy u?ytkownik wpisze nazwy LoRA.",
+  "description": "RasterRelay Flux.2 Klein 9B GGUF hybrid workflow: ReferenceLatent for full-image context + SetLatentNoiseMask for masked-only generation.",
   "inputs": {
     "sourceImage": {
       "nodeId": "10",
@@ -21,7 +21,27 @@
     "cfg": {
       "nodeId": "63",
       "inputName": "cfg"
-    }
+    },
+    "width": [
+      {
+        "nodeId": "21",
+        "inputName": "width"
+      },
+      {
+        "nodeId": "62",
+        "inputName": "width"
+      }
+    ],
+    "height": [
+      {
+        "nodeId": "21",
+        "inputName": "height"
+      },
+      {
+        "nodeId": "62",
+        "inputName": "height"
+      }
+    ]
   },
   "loraChain": {
     "modelSource": {
@@ -53,6 +73,8 @@
     "baseModel": "flux-2-klein-9b-Q4_K_M.gguf",
     "textEncoder": "qwen_3_8b_fp8mixed.safetensors",
     "vae": "flux2-vae.safetensors",
-    "maskChannel": "red"
+    "maskChannel": "LoadImageMask red channel",
+    "architecture": "Hybrid: ReferenceLatent (context) + SetLatentNoiseMask (masked generation)",
+    "cfg": "1 recommended for FLUX models"
   }
 }

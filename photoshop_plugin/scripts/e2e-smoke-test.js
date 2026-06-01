@@ -383,6 +383,11 @@ async function uploadImage(file, role) {
 }
 
 function setWorkflowInput(workflow, mappingItem, value) {
+  if (Array.isArray(mappingItem)) {
+    mappingItem.forEach((item) => setWorkflowInput(workflow, item, value));
+    return;
+  }
+
   const node = workflow[mappingItem.nodeId];
   if (!node?.inputs) {
     throw new Error(`Missing workflow node ${mappingItem.nodeId}.`);
@@ -391,12 +396,17 @@ function setWorkflowInput(workflow, mappingItem, value) {
   node.inputs[mappingItem.inputName] = value;
 }
 
-function applyWorkflowInputs(workflow, mapping, sourceUpload, maskUpload) {
+function applyWorkflowInputs(workflow, mapping, sourceUpload, maskUpload, size) {
   setWorkflowInput(workflow, mapping.inputs.sourceImage, sourceUpload.name);
   setWorkflowInput(workflow, mapping.inputs.selectionMask, maskUpload.name);
   setWorkflowInput(workflow, mapping.inputs.prompt, TEST_PROMPT);
   setWorkflowInput(workflow, mapping.inputs.steps, 8);
   setWorkflowInput(workflow, mapping.inputs.cfg, 4.2);
+
+  if (size?.width && size?.height) {
+    setWorkflowInput(workflow, mapping.inputs.width, Math.round(size.width));
+    setWorkflowInput(workflow, mapping.inputs.height, Math.round(size.height));
+  }
 }
 
 async function queueWorkflow(workflow) {
@@ -566,7 +576,7 @@ async function runRasterRelayE2ESmokeTest() {
   const sourceUpload = await uploadImage(sourceFile, "source");
   const maskUpload = await uploadImage(maskFile, "mask");
   const { workflow, mapping } = await loadWorkflowBundle();
-  applyWorkflowInputs(workflow, mapping, sourceUpload, maskUpload);
+  applyWorkflowInputs(workflow, mapping, sourceUpload, maskUpload, size);
   const promptId = await queueWorkflow(workflow);
   const outputImage = await waitForOutput(promptId);
   const resultFile = await downloadOutput(outputImage, dataFolder, prefix);
