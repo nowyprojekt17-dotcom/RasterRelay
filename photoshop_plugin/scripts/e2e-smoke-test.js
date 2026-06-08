@@ -400,12 +400,24 @@ function applyWorkflowInputs(workflow, mapping, sourceUpload, maskUpload, size) 
   setWorkflowInput(workflow, mapping.inputs.sourceImage, sourceUpload.name);
   setWorkflowInput(workflow, mapping.inputs.selectionMask, maskUpload.name);
   setWorkflowInput(workflow, mapping.inputs.prompt, TEST_PROMPT);
+  setWorkflowInput(workflow, mapping.inputs.negativePrompt, "hard square edges, visible seams, distorted hands, extra fingers");
   setWorkflowInput(workflow, mapping.inputs.steps, 8);
-  setWorkflowInput(workflow, mapping.inputs.cfg, 4.2);
+  setWorkflowInput(workflow, mapping.inputs.cfg, 1);
+  setWorkflowInput(workflow, mapping.inputs.seed, 424242);
+  setWorkflowInput(workflow, mapping.inputs.seedRandomize, "disable");
 
   if (size?.width && size?.height) {
     setWorkflowInput(workflow, mapping.inputs.width, Math.round(size.width));
     setWorkflowInput(workflow, mapping.inputs.height, Math.round(size.height));
+  }
+
+  if (mapping.inputs?.cropLeft) {
+    setWorkflowInput(workflow, mapping.inputs.cropLeft, 0);
+    setWorkflowInput(workflow, mapping.inputs.cropTop, 0);
+  }
+  if (mapping.inputs?.docWidth) {
+    setWorkflowInput(workflow, mapping.inputs.docWidth, Math.round(size.width));
+    setWorkflowInput(workflow, mapping.inputs.docHeight, Math.round(size.height));
   }
 }
 

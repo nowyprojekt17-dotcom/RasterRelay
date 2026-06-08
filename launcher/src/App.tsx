@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import logoUrl from "../../assets/brand/rasterrelay-logo.png";
@@ -168,7 +168,66 @@ type RasterRelayEnvironmentStartResult = {
   message: string;
 };
 
+type TaskMode = "replaceObject" | "removeTextLogo" | "detailRepair" | "backgroundClean";
+type QualityLevel = "fast" | "balanced" | "quality";
+
+type QualitySettings = {
+  schemaVersion: "rasterrelay.qualitySettings.v1";
+  taskMode: TaskMode;
+  quality: QualityLevel;
+  maskFeatherPx: number;
+  maskGrowPx: number;
+  variantCount: 1 | 2;
+  negativePrompt: string;
+};
+
+type LoraEntry = {
+  name: string;
+  strengthModel: number;
+  strengthClip: number;
+};
+
+type LoraConfig = {
+  schemaVersion: "rasterrelay.loraConfig.v1";
+  loras: LoraEntry[];
+};
+
 const savedComfyuiPathKey = "rasterrelay.comfyuiPath";
+
+const defaultQualitySettings: QualitySettings = {
+  schemaVersion: "rasterrelay.qualitySettings.v1",
+  taskMode: "replaceObject",
+  quality: "balanced",
+  maskFeatherPx: 24,
+  maskGrowPx: 0,
+  variantCount: 1,
+  negativePrompt:
+    "hard square edges, visible seams, distorted hands, extra fingers, unreadable artifacts, duplicated object, damaged background"
+};
+
+const defaultLoraConfig: LoraConfig = {
+  schemaVersion: "rasterrelay.loraConfig.v1",
+  loras: []
+};
+
+const taskModeCopy: Record<TaskMode, { label: string; description: string }> = {
+  replaceObject: {
+    label: "Zamiana obiektu",
+    description: "Najlepsze do zadań typu puszka na kubek. Chroni ręce, światło i tło."
+  },
+  removeTextLogo: {
+    label: "Usuń tekst/logo",
+    description: "Do czyszczenia napisów, numerów i znaków bez tworzenia nowych liter."
+  },
+  detailRepair: {
+    label: "Popraw detal",
+    description: "Do małych poprawek, gdzie reszta obrazu ma zostać prawie nietknięta."
+  },
+  backgroundClean: {
+    label: "Wyczyść tło",
+    description: "Do uzupełniania tła zgodnie z otoczeniem i światłem sceny."
+  }
+};
 
 const statusClass: Record<ReadinessStatus, string> = {
   gotowe: "status-ready",
@@ -247,6 +306,11 @@ function App() {
   const [photoshopRuntimeStatus, setPhotoshopRuntimeStatus] = useState<PhotoshopRuntimeStatus | null>(null);
   const [uxpRuntimeStatus, setUxpRuntimeStatus] = useState<UxpDeveloperToolsRuntimeStatus | null>(null);
   const [environmentResult, setEnvironmentResult] = useState<RasterRelayEnvironmentStartResult | null>(null);
+  const [qualitySettings, setQualitySettings] = useState<QualitySettings>(defaultQualitySettings);
+  const [isSavingQuality, setIsSavingQuality] = useState(false);
+  const [loraFiles, setLoraFiles] = useState<string[]>([]);
+  const [loraConfig, setLoraConfig] = useState<LoraConfig>(defaultLoraConfig);
+  const [isSavingLora, setIsSavingLora] = useState(false);
 
   async function loadReadiness(clearNotice = true) {
     setIsLoading(true);
@@ -261,6 +325,10 @@ function App() {
         ? await invoke<ReadinessReport>("scan_readiness_for_path", { path: savedPath })
         : await invoke<ReadinessReport>("scan_readiness");
       setReport(result);
+
+      if (result.comfyuiPath) {
+        void loadLoraFilesForPath(result.comfyuiPath);
+      }
 
       if (savedPath && !result.comfyuiPath) {
         localStorage.removeItem(savedComfyuiPathKey);
@@ -319,6 +387,98 @@ function App() {
     }
   }
 
+  async function loadLoraConfig() {
+    try {
+      const config = await invoke<LoraConfig>("get_lora_config");
+      setLoraConfig(config);
+    } catch {
+      setLoraConfig(defaultLoraConfig);
+    }
+  }
+
+  async function loadLoraFilesForPath(path: string) {
+    try {
+      const files = await invoke<string[]>("list_lora_files", { comfyuiPath: path });
+      setLoraFiles(files);
+    } catch {
+      setLoraFiles([]);
+    }
+  }
+
+  function toggleLoraEntry(name: string) {
+    setLoraConfig((prev) => {
+      const existing = prev.loras.find((l) => l.name === name);
+      if (existing) {
+        return { ...prev, loras: prev.loras.filter((l) => l.name !== name) };
+      }
+      return {
+        ...prev,
+        loras: [...prev.loras, { name, strengthModel: 1, strengthClip: 1 }]
+      };
+    });
+  }
+
+  function updateLoraStrength(name: string, field: "strengthModel" | "strengthClip", value: number) {
+    setLoraConfig((prev) => ({
+      ...prev,
+      loras: prev.loras.map((l) => (l.name === name ? { ...l, [field]: value } : l))
+    }));
+  }
+
+  async function saveLoraConfig() {
+    setIsSavingLora(true);
+    setNotice(null);
+    try {
+      const result = await invoke<AssetInstallResult>("save_lora_config", {
+        config: loraConfig
+      });
+      setNotice(result.message);
+    } catch {
+      setNotice("Nie udało się zapisać konfiguracji LoRA. Zapis działa w oknie Tauri.");
+    } finally {
+      setIsSavingLora(false);
+    }
+  }
+
+  async function handleAddLoraAndRefresh() {
+    await startAssetInstall("lora");
+  }
+  async function loadQualitySettings() {
+    try {
+      const settings = await invoke<QualitySettings>("get_quality_settings");
+      setQualitySettings({
+        ...defaultQualitySettings,
+        ...settings,
+        variantCount: settings.variantCount === 2 ? 2 : 1
+      });
+    } catch {
+      setQualitySettings(defaultQualitySettings);
+    }
+  }
+
+  function updateQualitySettings(patch: Partial<QualitySettings>) {
+    setQualitySettings((current) => ({
+      ...current,
+      ...patch
+    }));
+  }
+
+  async function saveQualitySettings() {
+    setIsSavingQuality(true);
+    setNotice(null);
+
+    try {
+      const result = await invoke<AssetInstallResult>("save_quality_settings", {
+        settings: qualitySettings
+      });
+      setNotice(result.message);
+    } catch {
+      setNotice("Nie udało się zapisać ustawień jakości. Zapis działa w oknie Tauri.");
+    } finally {
+      setIsSavingQuality(false);
+    }
+  }
+
   async function chooseComfyuiFolder() {
     setIsLoading(true);
     setNotice(null);
@@ -365,6 +525,8 @@ function App() {
     void refreshRuntimeStatus();
     void refreshPhotoshopRuntimeStatus();
     void refreshUxpRuntimeStatus();
+    void loadQualitySettings();
+    void loadLoraConfig();
 
     const timer = window.setInterval(() => {
       void refreshRuntimeStatus();
@@ -374,11 +536,6 @@ function App() {
 
     return () => window.clearInterval(timer);
   }, []);
-
-  const loraItem = useMemo(
-    () => report?.items.find((item) => item.id === "loras"),
-    [report]
-  );
 
   const hasSavedPath = Boolean(localStorage.getItem(savedComfyuiPathKey));
   const readinessItems = report?.items ?? [];
@@ -742,25 +899,108 @@ function App() {
       <section className="settings-panel" aria-label="Centrum ustawień RasterRelay">
         <div>
           <p className="eyebrow">Centrum ustawień</p>
-          <h2>Launcher przejmie opcje edycji</h2>
+          <h2>Jakość edycji</h2>
           <p>
-            Panel Photoshopa zostaje mały: łączność, dokument, prompt i start edycji. Jakość,
-            presety, LoRA i techniczne testy będziemy rozwijać tutaj.
+            Panel Photoshopa zostaje mały. Tutaj ustawiasz tryb zadania, miękkość maski i liczbę
+            wariantów, a panel użyje tych ustawień przy generowaniu.
           </p>
         </div>
-        <StatusBadge status="wymaga instalacji" />
+        <StatusBadge status="gotowe" />
+        <div className="quality-controls">
+          <label>
+            <span>Tryb zadania</span>
+            <select
+              value={qualitySettings.taskMode}
+              onChange={(event) => updateQualitySettings({ taskMode: event.target.value as TaskMode })}
+            >
+              {Object.entries(taskModeCopy).map(([value, copy]) => (
+                <option value={value} key={value}>
+                  {copy.label}
+                </option>
+              ))}
+            </select>
+            <small>{taskModeCopy[qualitySettings.taskMode].description}</small>
+          </label>
+          <label>
+            <span>Jakość</span>
+            <select
+              value={qualitySettings.quality}
+              onChange={(event) => updateQualitySettings({ quality: event.target.value as QualityLevel })}
+            >
+              <option value="fast">Szybka</option>
+              <option value="balanced">Dobra</option>
+              <option value="quality">Dokładna</option>
+            </select>
+          </label>
+          <label>
+            <span>Miękkość maski: {qualitySettings.maskFeatherPx}px</span>
+            <input
+              type="range"
+              min="0"
+              max="96"
+              step="1"
+              value={qualitySettings.maskFeatherPx}
+              onChange={(event) => updateQualitySettings({ maskFeatherPx: Number(event.target.value) })}
+            />
+          </label>
+          <label>
+            <span>
+              Rozszerzenie maski: {qualitySettings.maskGrowPx > 0 ? "+" : ""}
+              {qualitySettings.maskGrowPx}px
+            </span>
+            <input
+              type="range"
+              min="-64"
+              max="96"
+              step="1"
+              value={qualitySettings.maskGrowPx}
+              onChange={(event) => updateQualitySettings({ maskGrowPx: Number(event.target.value) })}
+            />
+            <small>Wartość ujemna zwęża maskę, dodatnia ją rozszerza.</small>
+          </label>
+          <label>
+            <span>Liczba wariantów</span>
+            <select
+              value={qualitySettings.variantCount}
+              onChange={(event) =>
+                updateQualitySettings({ variantCount: Number(event.target.value) === 2 ? 2 : 1 })
+              }
+            >
+              <option value={1}>1 wariant</option>
+              <option value={2}>2 warianty</option>
+            </select>
+          </label>
+          <label className="wide-control">
+            <span>Negatywny prompt</span>
+            <textarea
+              rows={3}
+              value={qualitySettings.negativePrompt}
+              onChange={(event) => updateQualitySettings({ negativePrompt: event.target.value })}
+            />
+          </label>
+        </div>
+        <div className="settings-actions">
+          <button className="primary-button" onClick={saveQualitySettings} disabled={isSavingQuality}>
+            {isSavingQuality ? "Zapisuję..." : "Zapisz ustawienia dla Photoshopa"}
+          </button>
+          <button className="ghost-button" onClick={() => setQualitySettings(defaultQualitySettings)}>
+            Przywróć domyślne
+          </button>
+        </div>
         <div className="settings-summary">
           <div>
-            <span>LoRA</span>
-            <p>{report?.counts.loras ?? 0} plików wykrytych w ComfyUI.</p>
+            <span>Tryb</span>
+            <p>{taskModeCopy[qualitySettings.taskMode].label}</p>
           </div>
           <div>
-            <span>Model GGUF</span>
-            <p>{report?.counts.ggufFiles ?? 0} plików GGUF wykrytych w modelach ComfyUI.</p>
+            <span>Maska</span>
+            <p>
+              Miękkość {qualitySettings.maskFeatherPx}px, zmiana {qualitySettings.maskGrowPx}px.
+            </p>
           </div>
           <div>
-            <span>Photoshop</span>
-            <p>Wtyczka ma działać jako lekki pilot, nie jako centrum ustawień.</p>
+            <span>Warianty</span>
+            <p>{qualitySettings.variantCount} wynik(i) dla trudniejszych masek.</p>
           </div>
         </div>
       </section>
@@ -1124,21 +1364,85 @@ function App() {
       ) : null}
 
       <section className="content-grid">
-        <article className="lora-panel">
+        <article className="lora-stack-panel">
           <div>
-            <p className="eyebrow">LoRA</p>
-            <h2>{report?.counts.loras ?? 0} dostępne</h2>
+            <p className="eyebrow">LoRA Stack</p>
+            <h2>{loraConfig.loras.length} aktywnych</h2>
             <p>
-              Workflow będzie projektowany tak, żeby działał bez LoRA, z jedną LoRA albo z kilkoma LoRA.
+              Zaznacz LoRA, które mają być użyte w workflow. Ustaw osobno siłę modelu i siłę CLIP dla każdej.
             </p>
           </div>
-          <StatusBadge status={loraItem?.status ?? "brak"} />
-          <button
-            className="secondary-button"
-            onClick={() => showPlaceholder("Add", "LoRA")}
-          >
-            Add
-          </button>
+          <StatusBadge status={loraFiles.length > 0 ? "wykryto" : "brak"} />
+          {loraFiles.length > 0 ? (
+            <div className="lora-stack-list">
+              {loraFiles.map((fileName) => {
+                const configEntry = loraConfig.loras.find((l) => l.name === fileName);
+                const isActive = Boolean(configEntry);
+                const strengthModel = configEntry?.strengthModel ?? 1;
+                const strengthClip = configEntry?.strengthClip ?? 1;
+                return (
+                  <div className={`lora-item ${isActive ? "lora-item-active" : ""}`} key={fileName}>
+                    <label className="lora-item-check">
+                      <input
+                        type="checkbox"
+                        checked={isActive}
+                        onChange={() => toggleLoraEntry(fileName)}
+                      />
+                      <span className="lora-item-name">{fileName}</span>
+                    </label>
+                    {isActive ? (
+                      <div className="lora-item-sliders">
+                        <label className="lora-slider-group">
+                          <span>Model: {strengthModel.toFixed(2)}</span>
+                          <input
+                            type="range"
+                            min="0"
+                            max="2"
+                            step="0.05"
+                            value={strengthModel}
+                            onChange={(e) => updateLoraStrength(fileName, "strengthModel", Number(e.target.value))}
+                          />
+                        </label>
+                        <label className="lora-slider-group">
+                          <span>CLIP: {strengthClip.toFixed(2)}</span>
+                          <input
+                            type="range"
+                            min="0"
+                            max="2"
+                            step="0.05"
+                            value={strengthClip}
+                            onChange={(e) => updateLoraStrength(fileName, "strengthClip", Number(e.target.value))}
+                          />
+                        </label>
+                      </div>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="lora-stack-empty">
+              {report?.comfyuiPath
+                ? "Brak plików LoRA w folderze models/loras."
+                : "Najpierw wybierz folder ComfyUI."}
+            </p>
+          )}
+          <div className="lora-stack-actions">
+            <button
+              className="secondary-button"
+              disabled={!report?.comfyuiPath}
+              onClick={handleAddLoraAndRefresh}
+            >
+              Dodaj
+            </button>
+            <button
+              className="primary-button"
+              disabled={isSavingLora || !report?.comfyuiPath}
+              onClick={saveLoraConfig}
+            >
+              {isSavingLora ? "Zapisuję..." : "Zapisz konfigurację"}
+            </button>
+          </div>
         </article>
 
         <section className="checklist" aria-label="Lista gotowości">
@@ -1166,7 +1470,7 @@ function App() {
       </section>
 
       <footer className="footer-note">
-        Etap 4: Launcher zaczyna aktywować ComfyUI. Photoshop i workflow nadal czekają na kolejne etapy.
+        RasterRelay sprawdza ComfyUI, modele, workflow, LoRA i panel Photoshop Beta 27.8. Konfiguracja LoRA (wybór i siły) jest teraz w Launcherze.
       </footer>
     </main>
   );

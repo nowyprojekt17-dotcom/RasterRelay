@@ -43,6 +43,28 @@ button:disabled {
   opacity: 0.7;
 }
 
+input,
+select,
+textarea {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  padding: 10px 11px;
+  color: #edf7ff;
+  background: rgba(0, 0, 0, 0.24);
+  font: inherit;
+}
+
+input[type="range"] {
+  padding: 0;
+  accent-color: var(--cyan);
+}
+
+textarea {
+  min-height: 82px;
+  resize: vertical;
+}
+
 code {
   display: inline-block;
   max-width: 100%;
@@ -255,6 +277,44 @@ p {
   display: grid;
   grid-column: 1 / -1;
   grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.quality-controls {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.quality-controls label {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.quality-controls span {
+  color: #ffffff;
+  font-weight: 800;
+}
+
+.quality-controls small {
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+.wide-control {
+  grid-column: 1 / -1;
+}
+
+.settings-actions {
+  display: flex;
+  grid-column: 1 / -1;
+  flex-wrap: wrap;
   gap: 10px;
 }
 
@@ -488,6 +548,7 @@ p {
 }
 
 .lora-panel,
+.lora-stack-panel,
 .status-card {
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -502,6 +563,88 @@ p {
 
 .lora-panel h2 {
   font-size: 2.2rem;
+}
+
+.lora-stack-panel {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+
+.lora-stack-panel h2 {
+  font-size: 2.2rem;
+}
+
+.lora-stack-list {
+  display: grid;
+  gap: 8px;
+}
+
+.lora-item {
+  display: grid;
+  gap: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.16);
+}
+
+.lora-item-active {
+  border-color: rgba(52, 217, 255, 0.24);
+  background: rgba(52, 217, 255, 0.05);
+}
+
+.lora-item-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.lora-item-check input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--cyan);
+  flex-shrink: 0;
+}
+
+.lora-item-name {
+  color: #ffffff;
+  font-weight: 800;
+  font-size: 0.88rem;
+  word-break: break-all;
+}
+
+.lora-item-sliders {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.lora-slider-group {
+  display: grid;
+  gap: 4px;
+}
+
+.lora-slider-group span {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.lora-slider-group input[type="range"] {
+  accent-color: var(--cyan);
+}
+
+.lora-stack-empty {
+  color: var(--muted);
+  font-size: 0.88rem;
+  padding: 8px 0;
+}
+
+.lora-stack-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
 .checklist {

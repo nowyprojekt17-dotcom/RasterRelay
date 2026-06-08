@@ -22,6 +22,66 @@
       "nodeId": "63",
       "inputName": "cfg"
     },
+    "negativePrompt": {
+      "nodeId": "32",
+      "inputName": "text"
+    },
+    "seed": {
+      "nodeId": "60",
+      "inputName": "noise_seed"
+    },
+    "seedRandomize": {
+      "nodeId": "60",
+      "inputName": "randomize_seed"
+    },
+    "lorasJson": {
+      "nodeId": "90",
+      "inputName": "loras_json"
+    },
+    "width": [
+      {
+        "nodeId": "21",
+        "inputName": "width"
+      },
+      {
+        "nodeId": "62",
+        "inputName": "width"
+      }
+    ],
+    "height": [
+      {
+        "nodeId": "21",
+        "inputName": "height"
+      },
+      {
+        "nodeId": "62",
+        "inputName": "height"
+      }
+    ],
+    "cropLeft": {
+      "nodeId": "91",
+      "inputName": "crop_left"
+    },
+    "cropTop": {
+      "nodeId": "91",
+      "inputName": "crop_top"
+    },
+    "cropWidth": {
+      "nodeId": "91",
+      "inputName": "crop_width"
+    },
+    "cropHeight": {
+      "nodeId": "91",
+      "inputName": "crop_height"
+    },
+    "docWidth": {
+      "nodeId": "91",
+      "inputName": "doc_width"
+    },
+    "docHeight": {
+      "nodeId": "91",
+      "inputName": "doc_height"
+    },
     "loras": [
       {
         "name": {

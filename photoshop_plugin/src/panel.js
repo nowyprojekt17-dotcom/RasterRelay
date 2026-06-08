@@ -2,15 +2,39 @@
 const COMFYUI_BASE_URL = "http://127.0.0.1:8188";
 const COMFYUI_SYSTEM_STATS_URL = `${COMFYUI_BASE_URL}/system_stats`;
 const JOB_FILE_NAME = "rasterrelay-inpainting-job.json";
+const QUALITY_SETTINGS_FILE_NAME = "rasterrelay-quality-settings.json";
+const LORA_CONFIG_FILE_NAME = "rasterrelay-lora-config.json";
 const WORKFLOW_FILE_NAME = "workflows/inpainting-api.json";
 const WORKFLOW_MAPPING_FILE_NAME = "workflows/inpainting-api.mapping.json";
 const E2E_AUTOSTART_FILE_NAME = "e2e-autostart.flag";
+const GEOMETRY_AUTOSTART_FILE_NAME = "geometry-autostart.flag";
+const GEOMETRY_TEST_SOURCE_FILE_NAME = "test_assets/can-source.png";
 const COMFY_HISTORY_TIMEOUT_MS = 10 * 60 * 1000;
 const COMFY_HISTORY_POLL_MS = 2000;
 const DEFAULT_MASK_FEATHER_RATIO = 0.015;
 const DEFAULT_MASK_FEATHER_MIN_PX = 8;
 const DEFAULT_MASK_FEATHER_MAX_PX = 32;
 const SELECTION_PADDING_PX = 96;
+const GENERATION_SIZE_MULTIPLE = 16;
+const GEOMETRY_TEST_SELECTION = {
+  centerX: 711,
+  centerY: 542,
+  radiusX: 42,
+  radiusY: 68
+};
+const panelHelpers = globalThis.RasterRelayPanelHelpers || {};
+const defaultQualitySettings = panelHelpers.normalizeQualitySettings
+  ? panelHelpers.normalizeQualitySettings({})
+  : {
+      schemaVersion: "rasterrelay.qualitySettings.v1",
+      taskMode: "replaceObject",
+      quality: "balanced",
+      maskFeatherPx: 24,
+      maskGrowPx: 0,
+      variantCount: 1,
+      negativePrompt:
+        "hard square edges, visible seams, distorted hands, extra fingers, unreadable artifacts, duplicated object, damaged background"
+    };
 const qualityPresets = {
   fast: {
     label: "Szybki test",
@@ -71,13 +95,8 @@ const panelMarkup = `
         <option value="fast">Szybki test</option>
         <option value="quality">Dokladna edycja</option>
       </select>
-      <textarea id="loraNamesInput"></textarea>
-      <input id="loraStrengthModelInput" type="number" value="1" />
-      <input id="loraStrengthClipInput" type="number" value="1" />
       <button id="readinessButton" type="button"></button>
       <button id="packageButton" type="button"></button>
-      <p id="loraCatalogText"></p>
-      <div id="loraList"></div>
     </section>
   </main>
 `;
@@ -103,11 +122,6 @@ function collectUi(rootNode) {
     documentButton: findPanelElement(rootNode, "documentButton"),
     e2eSmokeButton: findPanelElement(rootNode, "e2eSmokeButton"),
     heartbeatText: findPanelElement(rootNode, "heartbeatText"),
-    loraCatalogText: findPanelElement(rootNode, "loraCatalogText"),
-    loraList: findPanelElement(rootNode, "loraList"),
-    loraNamesInput: findPanelElement(rootNode, "loraNamesInput"),
-    loraStrengthClipInput: findPanelElement(rootNode, "loraStrengthClipInput"),
-    loraStrengthModelInput: findPanelElement(rootNode, "loraStrengthModelInput"),
     messageText: findPanelElement(rootNode, "messageText"),
     packageButton: findPanelElement(rootNode, "packageButton"),
     prepareButton: findPanelElement(rootNode, "prepareButton"),
@@ -173,7 +187,6 @@ async function checkComfyUi() {
 
     setComfyStatus(true, "ComfyUI: aktywne");
     setMessage("ComfyUI odpowiada. Możesz przygotować edycję z panelu RasterRelay.");
-    void refreshLoraCatalog();
     return true;
   } catch {
     setComfyStatus(false, "ComfyUI: brak połączenia");
@@ -278,6 +291,10 @@ function getSelectionInfo(document) {
 }
 
 function calculatePaddedBounds(selectionBounds, docWidth, docHeight, padding) {
+  if (panelHelpers.calculatePaddedBounds) {
+    return panelHelpers.calculatePaddedBounds(selectionBounds, docWidth, docHeight, padding);
+  }
+
   const left = Math.max(0, Math.round(selectionBounds.left) - padding);
   const top = Math.max(0, Math.round(selectionBounds.top) - padding);
   const right = Math.min(docWidth, Math.round(selectionBounds.right) + padding);
@@ -307,70 +324,76 @@ function getQualityPreset() {
   return qualityPresets[ui.qualitySelect.value] || qualityPresets.balanced;
 }
 
-function readStrengthInput(element, fallback) {
-  const value = Number(element?.value);
-  if (!Number.isFinite(value)) {
-    return fallback;
-  }
-
-  return Math.min(2, Math.max(0, value));
+function getQualityPresetForSettings(settings) {
+  return qualityPresets[settings?.quality] || qualityPresets.balanced;
 }
 
-function getDefaultLoraStrengths() {
-  return {
-    model: readStrengthInput(ui.loraStrengthModelInput, 1),
-    clip: readStrengthInput(ui.loraStrengthClipInput, 1)
-  };
+async function loadQualitySettings() {
+  const text = await getOptionalPluginTextFile(QUALITY_SETTINGS_FILE_NAME);
+  if (!text) {
+    return defaultQualitySettings;
+  }
+
+  try {
+    const parsed = JSON.parse(text);
+    return panelHelpers.normalizeQualitySettings
+      ? panelHelpers.normalizeQualitySettings(parsed)
+      : { ...defaultQualitySettings, ...parsed };
+  } catch {
+    return defaultQualitySettings;
+  }
 }
 
-function parseLoraToken(token, defaultStrengths) {
-  const trimmed = token.trim();
-  if (!trimmed) {
-    return null;
+async function loadLoraConfig() {
+  const text = await getOptionalPluginTextFile(LORA_CONFIG_FILE_NAME);
+  if (!text) {
+    return { schemaVersion: "rasterrelay.loraConfig.v1", loras: [] };
   }
-
-  const parts = trimmed.split(":").map((part) => part.trim()).filter(Boolean);
-  const name = parts[0];
-  if (!name) {
-    return null;
-  }
-
-  if (parts.length === 1) {
+  try {
+    const parsed = JSON.parse(text);
     return {
-      name,
-      strengthModel: defaultStrengths.model,
-      strengthClip: defaultStrengths.clip
+      schemaVersion: parsed.schemaVersion || "rasterrelay.loraConfig.v1",
+      loras: Array.isArray(parsed.loras) ? parsed.loras : []
     };
+  } catch {
+    return { schemaVersion: "rasterrelay.loraConfig.v1", loras: [] };
   }
-
-  const strengthModel = Number(parts[1]);
-  const strengthClip = Number(parts[2]);
-
-  return {
-    name,
-    strengthModel: Number.isFinite(strengthModel)
-      ? Math.min(2, Math.max(0, strengthModel))
-      : defaultStrengths.model,
-    strengthClip: Number.isFinite(strengthClip)
-      ? Math.min(2, Math.max(0, strengthClip))
-      : Number.isFinite(strengthModel)
-        ? Math.min(2, Math.max(0, strengthModel))
-        : defaultStrengths.clip
-  };
-}
-
-function getLoraItems() {
-  const defaultStrengths = getDefaultLoraStrengths();
-  const rawNames = ui.loraNamesInput.value || "";
-
-  return rawNames
-    .split(/[\n,]+/)
-    .map((token) => parseLoraToken(token, defaultStrengths))
-    .filter((item) => item?.name);
 }
 
 function createSafeTimestamp() {
   return new Date().toISOString().replace(/[:.]/g, "-");
+}
+
+function readPngUint32(bytes, offset) {
+  return (
+    ((bytes[offset] << 24) >>> 0) +
+    ((bytes[offset + 1] << 16) >>> 0) +
+    ((bytes[offset + 2] << 8) >>> 0) +
+    (bytes[offset + 3] >>> 0)
+  );
+}
+
+async function readPngDimensions(file) {
+  const uxp = getUxpApi();
+  const binaryFormat = uxp?.storage?.formats?.binary;
+  const buffer = await file.read(binaryFormat ? { format: binaryFormat } : {});
+  const bytes = buffer instanceof Uint8Array ? buffer : new Uint8Array(buffer);
+  const pngSignature = [137, 80, 78, 71, 13, 10, 26, 10];
+
+  if (bytes.length < 24 || pngSignature.some((value, index) => bytes[index] !== value)) {
+    throw new Error("Wyeksportowany plik nie wyglada jak poprawny PNG.");
+  }
+
+  return {
+    width: readPngUint32(bytes, 16),
+    height: readPngUint32(bytes, 20)
+  };
+}
+
+function createVariantSeeds(count) {
+  const normalizedCount = Math.max(1, Math.min(2, Math.round(count || 1)));
+  const baseSeed = Date.now() % 1000000000;
+  return Array.from({ length: normalizedCount }, (_, index) => baseSeed + index * 1009);
 }
 
 function validateJobInputs(prompt, document) {
@@ -390,11 +413,53 @@ function validateJobInputs(prompt, document) {
   return null;
 }
 
-function buildInpaintingJob(document, prompt, assets, cropBounds) {
+function calculateGenerationBounds(cropBounds, docWidth, docHeight, multiple = GENERATION_SIZE_MULTIPLE) {
+  if (panelHelpers.calculateGenerationBounds) {
+    return panelHelpers.calculateGenerationBounds(cropBounds, docWidth, docHeight, multiple);
+  }
+
+  const targetWidth = Math.min(docWidth, Math.ceil(cropBounds.width / multiple) * multiple);
+  const targetHeight = Math.min(docHeight, Math.ceil(cropBounds.height / multiple) * multiple);
+  const left = Math.min(cropBounds.left, Math.max(0, docWidth - targetWidth));
+  const top = Math.min(cropBounds.top, Math.max(0, docHeight - targetHeight));
+
+  return {
+    left,
+    top,
+    right: left + targetWidth,
+    bottom: top + targetHeight,
+    width: targetWidth,
+    height: targetHeight,
+    multiple
+  };
+}
+
+function buildInpaintingJob(
+  document,
+  prompt,
+  assets,
+  cropBounds,
+  qualitySettings,
+  maskMetadata,
+  variantSeeds,
+  loraConfig,
+  geometry = {}
+) {
   const size = readDocumentSize(document);
   const selection = getSelectionInfo(document);
-  const loraItems = getLoraItems();
-  const quality = getQualityPreset();
+  const loraItems = (loraConfig?.loras) || [];
+  const quality = getQualityPresetForSettings(qualitySettings);
+  const finalPrompt = panelHelpers.buildFinalPrompt
+    ? panelHelpers.buildFinalPrompt(qualitySettings, prompt)
+    : prompt;
+  const visibilityMask = maskMetadata?.visibility || {};
+  const generationMask = maskMetadata?.generation || {};
+  const primaryMaskAnalysis = generationMask.analysis || visibilityMask.analysis || maskMetadata?.analysis || { warnings: [] };
+  const maskWarnings = Array.from(new Set([
+    ...(generationMask.analysis?.warnings || []),
+    ...(visibilityMask.analysis?.warnings || []),
+    ...(primaryMaskAnalysis.warnings || [])
+  ]));
 
   return {
     schemaVersion: "rasterrelay.inpaintingJob.v1",
@@ -415,13 +480,45 @@ function buildInpaintingJob(document, prompt, assets, cropBounds) {
       bounds: selection.bounds,
       solid: selection.solid
     },
+    selectionBounds: selection.bounds,
+    paddedBounds: geometry.paddedBounds || cropBounds,
+    generationBounds: geometry.generationBounds || cropBounds,
     cropBounds,
     assets,
     generation: {
       tool: "inpainting-brush",
+      taskMode: qualitySettings.taskMode,
       prompt,
+      finalPrompt,
+      negativePrompt: qualitySettings.negativePrompt,
       baseModelKind: "gguf",
       quality,
+      mask: {
+        mode: "dual-mask",
+        featherPx: visibilityMask.options?.featherPx ?? qualitySettings.maskFeatherPx,
+        growPx: visibilityMask.options?.growPx ?? qualitySettings.maskGrowPx,
+        visibility: {
+          role: "photoshop-layer-mask",
+          mode: visibilityMask.mode || "photoshop-selection-pixels-soft",
+          featherPx: visibilityMask.options?.featherPx ?? qualitySettings.maskFeatherPx,
+          growPx: visibilityMask.options?.growPx ?? qualitySettings.maskGrowPx,
+          analysis: visibilityMask.analysis || null
+        },
+        generation: {
+          role: "comfy-denoise-mask",
+          mode: generationMask.mode || "processed-crop-selection-mask",
+          featherPx: generationMask.options?.featherPx ?? qualitySettings.maskFeatherPx,
+          growPx: generationMask.options?.growPx ?? qualitySettings.maskGrowPx,
+          haloPx: generationMask.options?.haloPx ?? 0,
+          analysis: generationMask.analysis || null
+        },
+        analysis: primaryMaskAnalysis,
+        warnings: maskWarnings
+      },
+      variants: variantSeeds.map((seed, index) => ({
+        index: index + 1,
+        seed
+      })),
       lora: {
         enabled: loraItems.length > 0,
         items: loraItems
@@ -471,31 +568,47 @@ async function getOptionalPluginTextFile(relativePath) {
   }
 }
 
-async function exportDocumentPng(document, dataFolder, filePrefix) {
-  const photoshop = getPhotoshopApi();
-  if (!photoshop) {
-    throw new Error("Photoshop API is unavailable.");
+async function getPluginEntry(relativePath) {
+  const uxp = getUxpApi();
+
+  if (!uxp) {
+    throw new Error("UXP storage is unavailable.");
   }
 
-  const file = await dataFolder.createFile(`${filePrefix}-source.png`, {
-    overwrite: true
-  });
+  const pluginFolder = await uxp.storage.localFileSystem.getPluginFolder();
+  const parts = relativePath.split("/");
+  let entry = pluginFolder;
 
-  await photoshop.core.executeAsModal(
-    async () => {
-      await document.saveAs.png(file, { compression: 6 }, true);
-    },
-    { commandName: "RasterRelay Export Source PNG" }
-  );
+  for (const part of parts) {
+    entry = await entry.getEntry(part);
+  }
 
-  return {
-    asset: {
-      kind: "sourceImage",
-      format: "png",
-      path: file.nativePath || file.name
-    },
-    file
-  };
+  return entry;
+}
+
+async function removeOptionalPluginFile(relativePath) {
+  const uxp = getUxpApi();
+
+  if (!uxp) {
+    return false;
+  }
+
+  try {
+    const pluginFolder = await uxp.storage.localFileSystem.getPluginFolder();
+    const parts = relativePath.split("/");
+    const fileName = parts.pop();
+    let entry = pluginFolder;
+
+    for (const part of parts) {
+      entry = await entry.getEntry(part);
+    }
+
+    const file = await entry.getEntry(fileName);
+    await file.delete();
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 async function exportCroppedSourcePng(document, dataFolder, filePrefix, paddedBounds) {
@@ -510,40 +623,58 @@ async function exportCroppedSourcePng(document, dataFolder, filePrefix, paddedBo
 
   await photoshop.core.executeAsModal(
     async () => {
-      await photoshop.action.batchPlay([
-        {
-          _obj: "crop",
-          top: { _unit: "pixelsUnit", _value: paddedBounds.top },
-          left: { _unit: "pixelsUnit", _value: paddedBounds.left },
-          bottom: { _unit: "pixelsUnit", _value: paddedBounds.bottom },
-          right: { _unit: "pixelsUnit", _value: paddedBounds.right }
+      let exportDocument = null;
+
+      try {
+        // Export from a temporary merged duplicate so the user's document, layers
+        // and selection are not modified while we crop the source image.
+        exportDocument = await document.duplicate(`RasterRelay export ${filePrefix}`, true);
+        await clearActiveSelection(photoshop);
+        await exportDocument.crop({
+          left: Math.round(paddedBounds.left),
+          top: Math.round(paddedBounds.top),
+          right: Math.round(paddedBounds.right),
+          bottom: Math.round(paddedBounds.bottom)
+        });
+        await exportDocument.saveAs.png(file, { compression: 6 }, true);
+      } finally {
+        if (exportDocument) {
+          try {
+            exportDocument.closeWithoutSaving();
+          } catch {
+            // The export document is temporary; failure to close should not hide
+            // the original export error.
+          }
         }
-      ], {});
-
-      await document.saveAs.png(file, { compression: 6 }, true);
-
-      await photoshop.action.batchPlay([
-        { _obj: "select", _target: [{ _ref: "historyState", _enum: "ordinal", _value: "previous" }] }
-      ], {});
+      }
     },
     { commandName: "RasterRelay Export Cropped Source PNG" }
   );
+
+  const exportedSize = await readPngDimensions(file);
+  if (exportedSize.width !== paddedBounds.width || exportedSize.height !== paddedBounds.height) {
+    throw new Error(
+      `Eksport z Photoshopa ma zly rozmiar: ${exportedSize.width} x ${exportedSize.height}, a powinien miec ${paddedBounds.width} x ${paddedBounds.height}.`
+    );
+  }
 
   return {
     asset: {
       kind: "sourceImage",
       format: "png",
       path: file.nativePath || file.name,
+      width: exportedSize.width,
+      height: exportedSize.height,
       croppedBounds: paddedBounds
     },
     file
   };
 }
 
-async function exportCroppedMaskPng(document, dataFolder, filePrefix, paddedBounds) {
+async function captureGenerationMaskData(document, paddedBounds, qualitySettings) {
   const photoshop = getPhotoshopApi();
   if (!photoshop?.imaging) {
-    throw new Error("Photoshop Imaging API is unavailable.");
+    throw new Error("Photoshop Imaging API is not available. Update Photoshop or check UXP permissions in manifest.");
   }
 
   const selection = getSelectionInfo(document);
@@ -551,73 +682,67 @@ async function exportCroppedMaskPng(document, dataFolder, filePrefix, paddedBoun
     throw new Error("No selection found.");
   }
 
-  const selectionImage = await photoshop.imaging.getSelection({
-    documentID: document.id,
-    sourceBounds: selection.bounds
-  });
+  return await photoshop.core.executeAsModal(async () => {
+    const selectionImage = await photoshop.imaging.getSelection({
+      documentID: document.id,
+      sourceBounds: selection.bounds
+    });
 
-  try {
-    const pixelData = await selectionImage.imageData.getData();
-    const selSize = getImageDataSize(selectionImage);
-    const components = Math.max(1, Math.round(pixelData.length / (selSize.width * selSize.height)));
+    try {
+      const size = getImageDataSize(selectionImage);
+      const pixelData = await selectionImage.imageData.getData();
+      const components = Math.max(1, Math.round(pixelData.length / (size.width * size.height)));
+      const cropMaskValues = new Uint8Array(paddedBounds.width * paddedBounds.height);
 
-    const maskWidth = paddedBounds.width;
-    const maskHeight = paddedBounds.height;
-    const maskPixels = new Uint8Array(maskWidth * maskHeight * 4);
+      const selLeft = Math.round(selectionImage.sourceBounds?.left ?? selection.bounds.left);
+      const selTop = Math.round(selectionImage.sourceBounds?.top ?? selection.bounds.top);
 
-    for (let i = 0; i < maskWidth * maskHeight; i++) {
-      maskPixels[i * 4 + 3] = 255;
-    }
+      for (let y = 0; y < size.height; y += 1) {
+        for (let x = 0; x < size.width; x += 1) {
+          const targetX = selLeft + x - paddedBounds.left;
+          const targetY = selTop + y - paddedBounds.top;
 
-    const selLeft = Math.round(selectionImage.sourceBounds?.left ?? selection.bounds.left);
-    const selTop = Math.round(selectionImage.sourceBounds?.top ?? selection.bounds.top);
+          if (targetX < 0 || targetY < 0 || targetX >= paddedBounds.width || targetY >= paddedBounds.height) {
+            continue;
+          }
 
-    for (let y = 0; y < selSize.height; y += 1) {
-      for (let x = 0; x < selSize.width; x += 1) {
-        const srcIdx = (y * selSize.width + x) * components;
-        let maskValue;
-
-        if (components === 1) {
-          maskValue = pixelData[srcIdx];
-        } else if (components === 4) {
-          maskValue = pixelData[srcIdx + 3];
-        } else {
-          maskValue = pixelData[srcIdx];
-        }
-
-        const targetX = selLeft + x - paddedBounds.left;
-        const targetY = selTop + y - paddedBounds.top;
-
-        if (targetX >= 0 && targetY >= 0 && targetX < maskWidth && targetY < maskHeight) {
-          const offset = (targetY * maskWidth + targetX) * 4;
-          maskPixels[offset] = maskValue;
-          maskPixels[offset + 1] = maskValue;
-          maskPixels[offset + 2] = maskValue;
+          cropMaskValues[targetY * paddedBounds.width + targetX] = readMaskPixelValue(
+            pixelData,
+            y * size.width + x,
+            components
+          );
         }
       }
+
+      const processedMask = processMaskChannel(
+        cropMaskValues,
+        paddedBounds.width,
+        paddedBounds.height,
+        qualitySettings,
+        "generation"
+      );
+
+      return {
+        role: "generationMask",
+        pixels: processedMask.values,
+        selWidth: paddedBounds.width,
+        selHeight: paddedBounds.height,
+        selLeft: 0,
+        selTop: 0,
+        fullWidth: paddedBounds.width,
+        fullHeight: paddedBounds.height,
+        feather: 0,
+        featherRadius: processedMask.options.featherPx,
+        growPx: processedMask.options.growPx,
+        haloPx: processedMask.options.haloPx,
+        options: processedMask.options,
+        analysis: processedMask.analysis,
+        mode: "processed-crop-selection-mask"
+      };
+    } finally {
+      selectionImage.imageData?.dispose?.();
     }
-
-    softenMaskPixels({ width: maskWidth, height: maskHeight, pixels: maskPixels });
-
-    const file = await dataFolder.createFile(`${filePrefix}-mask-cropped.png`, {
-      overwrite: true
-    });
-    const pngBuffer = encodePngRgba(maskWidth, maskHeight, maskPixels);
-    await file.write(pngBuffer);
-
-    return {
-      asset: {
-        kind: "selectionMask",
-        format: "png",
-        path: file.nativePath || file.name,
-        mode: "cropped-selection-pixels",
-        croppedBounds: paddedBounds
-      },
-      file
-    };
-  } finally {
-    selectionImage.imageData?.dispose?.();
-  }
+  }, { commandName: "RasterRelay Capture Selection" });
 }
 
 const pngCrcTable = (() => {
@@ -751,33 +876,6 @@ function encodePngRgba(width, height, rgbaPixels) {
   return png.buffer;
 }
 
-function createBoundsMaskPixels(photoshopDocument, selection) {
-  const size = readDocumentSize(photoshopDocument);
-  const width = Math.max(1, Math.round(size.width || selection.bounds.right));
-  const height = Math.max(1, Math.round(size.height || selection.bounds.bottom));
-  const pixels = new Uint8Array(width * height * 4);
-  const left = Math.max(0, Math.round(selection.bounds.left));
-  const top = Math.max(0, Math.round(selection.bounds.top));
-  const right = Math.min(width, Math.round(selection.bounds.right));
-  const bottom = Math.min(height, Math.round(selection.bounds.bottom));
-
-  for (let index = 0; index < width * height; index += 1) {
-    pixels[index * 4 + 3] = 255;
-  }
-
-  for (let y = top; y < bottom; y += 1) {
-    for (let x = left; x < right; x += 1) {
-      const offset = (y * width + x) * 4;
-      pixels[offset] = 255;
-      pixels[offset + 1] = 255;
-      pixels[offset + 2] = 255;
-      pixels[offset + 3] = 255;
-    }
-  }
-
-  return { width, height, pixels };
-}
-
 function getImageDataSize(selectionImage) {
   return {
     width:
@@ -808,32 +906,6 @@ function readMaskPixelValue(data, pixelIndex, components) {
   const green = data[index + 1] ?? red;
   const blue = data[index + 2] ?? red;
   return Math.round((red + green + blue) / 3);
-}
-
-function putSelectionPixelsOnMask(mask, selectionImage, pixelData) {
-  const size = getImageDataSize(selectionImage);
-  const components = Math.max(1, Math.round(pixelData.length / (size.width * size.height)));
-  const left = Math.round(selectionImage.sourceBounds.left);
-  const top = Math.round(selectionImage.sourceBounds.top);
-
-  for (let y = 0; y < size.height; y += 1) {
-    for (let x = 0; x < size.width; x += 1) {
-      const sourcePixelIndex = y * size.width + x;
-      const targetX = left + x;
-      const targetY = top + y;
-
-      if (targetX < 0 || targetY < 0 || targetX >= mask.width || targetY >= mask.height) {
-        continue;
-      }
-
-      const maskValue = readMaskPixelValue(pixelData, sourcePixelIndex, components);
-      const targetOffset = (targetY * mask.width + targetX) * 4;
-      mask.pixels[targetOffset] = maskValue;
-      mask.pixels[targetOffset + 1] = maskValue;
-      mask.pixels[targetOffset + 2] = maskValue;
-      mask.pixels[targetOffset + 3] = 255;
-    }
-  }
 }
 
 function getDefaultMaskFeatherRadius(width, height) {
@@ -920,103 +992,171 @@ function softenMaskPixels(mask, radius = getDefaultMaskFeatherRadius(mask.width,
   }
 
   const original = getMaskChannel(mask);
-  const horizontal = blurMaskHorizontal(original, mask.width, mask.height, radius);
-  const vertical = blurMaskVertical(horizontal, mask.width, mask.height, radius);
+  const vertical = panelHelpers.softenGrayscaleMask
+    ? panelHelpers.softenGrayscaleMask(original, mask.width, mask.height, radius)
+    : blurMaskVertical(blurMaskHorizontal(original, mask.width, mask.height, radius), mask.width, mask.height, radius);
   writeMaskChannel(mask, vertical);
   return radius;
 }
 
-function createSoftMaskChannelFromSelection(selectionImage, pixelData, radius) {
-  const size = getImageDataSize(selectionImage);
-  const components = Math.max(1, Math.round(pixelData.length / (size.width * size.height)));
-  const maskValues = new Uint8Array(size.width * size.height);
-
-  for (let index = 0; index < maskValues.length; index += 1) {
-    maskValues[index] = readMaskPixelValue(pixelData, index, components);
+function getMaskOptions(settings, width, height, role = "visibility") {
+  if (role === "generation" && panelHelpers.getGenerationMaskOptions) {
+    return panelHelpers.getGenerationMaskOptions(settings);
+  }
+  if (role === "visibility" && panelHelpers.getVisibilityMaskOptions) {
+    return panelHelpers.getVisibilityMaskOptions(settings);
   }
 
-  if (radius <= 0) {
-    return maskValues;
-  }
-
-  const horizontal = blurMaskHorizontal(maskValues, size.width, size.height, radius);
-  return blurMaskVertical(horizontal, size.width, size.height, radius);
-}
-
-async function exportExactSelectionMaskPng(photoshopDocument, dataFolder, filePrefix) {
-  const photoshop = getPhotoshopApi();
-  if (!photoshop?.imaging) {
-    throw new Error("Photoshop Imaging API is unavailable.");
-  }
-
-  const selection = getSelectionInfo(photoshopDocument);
-  const selectionImage = await photoshop.imaging.getSelection({
-    documentID: photoshopDocument.id,
-    sourceBounds: selection.bounds
-  });
-
-  try {
-    const pixelData = await selectionImage.imageData.getData();
-    const mask = createBoundsMaskPixels(photoshopDocument, {
-      ...selection,
-      bounds: { left: 0, top: 0, right: 0, bottom: 0 }
-    });
-    putSelectionPixelsOnMask(mask, selectionImage, pixelData);
-    const featherRadius = softenMaskPixels(mask);
-
-    const file = await dataFolder.createFile(`${filePrefix}-mask-selection.png`, {
-      overwrite: true
-    });
-    const pngBuffer = encodePngRgba(mask.width, mask.height, mask.pixels);
-    await file.write(pngBuffer);
-
+  const normalized = panelHelpers.normalizeQualitySettings
+    ? panelHelpers.normalizeQualitySettings(settings)
+    : defaultQualitySettings;
+  const fallbackFeather = getDefaultMaskFeatherRadius(width, height);
+  if (role === "generation") {
+    const haloPx = {
+      fast: 8,
+      balanced: 16,
+      quality: 24
+    }[normalized.quality] || 16;
     return {
-      asset: {
-        kind: "selectionMask",
-        format: "png",
-        path: file.nativePath || file.name,
-        mode: "photoshop-selection-pixels",
-        sourceBounds: selectionImage.sourceBounds,
-        featherRadius,
-        note:
-          "Maska została utworzona z pikselowej reprezentacji zaznaczenia Photoshopa i ma miękką krawędź."
-      },
-      file
+      role: "generation",
+      featherPx: Math.min(96, Math.max(Math.round(normalized.maskFeatherPx), haloPx)),
+      growPx: Math.min(96, Math.max(0, Math.round(normalized.maskGrowPx)) + haloPx),
+      haloPx
     };
-  } finally {
-    selectionImage.imageData?.dispose?.();
   }
-}
-
-async function exportBoundsMaskPng(photoshopDocument, dataFolder, filePrefix) {
-  const selection = getSelectionInfo(photoshopDocument);
-  const file = await dataFolder.createFile(`${filePrefix}-mask-bounds.png`, {
-    overwrite: true
-  });
-  const mask = createBoundsMaskPixels(photoshopDocument, selection);
-  const featherRadius = softenMaskPixels(mask);
-  const pngBuffer = encodePngRgba(mask.width, mask.height, mask.pixels);
-
-  await file.write(pngBuffer);
 
   return {
-    asset: {
-      kind: "selectionMask",
-      format: "png",
-      path: file.nativePath || file.name,
-      mode: selection.solid ? "solid-selection-bounds" : "selection-bounds-preview",
-      featherRadius,
-      note:
-        "Awaryjna maska używa granic zaznaczenia i dodaje miękką krawędź. Nieregularna selekcja nadal jest lepsza od prostego prostokąta."
-    },
-    file
+    role: "visibility",
+    featherPx: Number.isFinite(Number(normalized.maskFeatherPx))
+      ? Math.max(0, Math.round(normalized.maskFeatherPx))
+      : fallbackFeather,
+    growPx: Number.isFinite(Number(normalized.maskGrowPx))
+      ? Math.round(normalized.maskGrowPx)
+      : 0,
+    haloPx: 0
   };
 }
 
-async function exportInpaintingAssets(document, dataFolder) {
+function processMaskChannel(values, width, height, settings, role = "visibility") {
+  const options = getMaskOptions(settings, width, height, role);
+  const grown = panelHelpers.growOrContractMask
+    ? panelHelpers.growOrContractMask(values, width, height, options.growPx)
+    : new Uint8Array(values);
+  const softened = panelHelpers.softenGrayscaleMask
+    ? panelHelpers.softenGrayscaleMask(grown, width, height, options.featherPx)
+    : blurMaskVertical(
+        blurMaskHorizontal(grown, width, height, options.featherPx),
+        width,
+        height,
+        options.featherPx
+      );
+
+  return {
+    values: softened,
+    role,
+    options,
+    analysis: panelHelpers.analyzeMask
+      ? panelHelpers.analyzeMask(softened, width, height)
+      : {
+          warnings: []
+        }
+  };
+}
+
+async function captureSoftFullDocumentMaskPixels(photoshop, document, qualitySettings) {
+  if (!photoshop?.imaging?.getSelection) {
+    return null;
+  }
+
+  const selection = getSelectionInfo(document);
+  if (!selection.hasSelection) {
+    return null;
+  }
+
+  return await photoshop.core.executeAsModal(
+    async () => {
+      const docSize = readDocumentSize(document);
+      const docWidth = Math.round(docSize.width);
+      const docHeight = Math.round(docSize.height);
+      const selectionImage = await photoshop.imaging.getSelection({
+        documentID: document.id,
+        sourceBounds: selection.bounds
+      });
+
+      try {
+        const selSize = getImageDataSize(selectionImage);
+        const selectionPixels = await selectionImage.imageData.getData();
+        const components = Math.max(1, Math.round(selectionPixels.length / (selSize.width * selSize.height)));
+        const fullMaskPixels = new Uint8Array(docWidth * docHeight);
+        const selLeft = Math.round(selectionImage.sourceBounds?.left ?? selection.bounds.left);
+        const selTop = Math.round(selectionImage.sourceBounds?.top ?? selection.bounds.top);
+
+        for (let y = 0; y < selSize.height; y += 1) {
+          for (let x = 0; x < selSize.width; x += 1) {
+            const targetX = selLeft + x;
+            const targetY = selTop + y;
+
+            if (targetX < 0 || targetY < 0 || targetX >= docWidth || targetY >= docHeight) {
+              continue;
+            }
+
+            fullMaskPixels[targetY * docWidth + targetX] = readMaskPixelValue(
+              selectionPixels,
+              y * selSize.width + x,
+              components
+            );
+          }
+        }
+
+        const processedMask = processMaskChannel(fullMaskPixels, docWidth, docHeight, qualitySettings, "visibility");
+
+        return {
+          role: "visibilityMask",
+          width: docWidth,
+          height: docHeight,
+          pixels: processedMask.values,
+          featherRadius: processedMask.options.featherPx,
+          growPx: processedMask.options.growPx,
+          haloPx: processedMask.options.haloPx,
+          options: processedMask.options,
+          analysis: processedMask.analysis,
+          sourceBounds: selectionImage.sourceBounds || selection.bounds,
+          mode: "photoshop-selection-pixels-soft"
+        };
+      } finally {
+        selectionImage.imageData?.dispose?.();
+      }
+    },
+    { commandName: "RasterRelay Capture Soft Layer Mask" }
+  );
+}
+
+function summarizeMaskData(maskData) {
+  if (!maskData) {
+    return null;
+  }
+
+  return {
+    role: maskData.role,
+    mode: maskData.mode,
+    width: maskData.width || maskData.fullWidth || maskData.selWidth,
+    height: maskData.height || maskData.fullHeight || maskData.selHeight,
+    selWidth: maskData.selWidth,
+    selHeight: maskData.selHeight,
+    featherRadius: maskData.featherRadius,
+    growPx: maskData.growPx,
+    haloPx: maskData.haloPx,
+    options: maskData.options,
+    analysis: maskData.analysis,
+    sourceBounds: maskData.sourceBounds
+  };
+}
+
+async function exportInpaintingAssets(document, dataFolder, qualitySettings) {
   const filePrefix = `rasterrelay-${createSafeTimestamp()}`;
   const size = readDocumentSize(document);
   const selection = getSelectionInfo(document);
+  const photoshop = getPhotoshopApi();
 
   const paddedBounds = calculatePaddedBounds(
     selection.bounds,
@@ -1024,27 +1164,37 @@ async function exportInpaintingAssets(document, dataFolder) {
     Math.round(size.height),
     SELECTION_PADDING_PX
   );
+  const generationBounds = calculateGenerationBounds(
+    paddedBounds,
+    Math.round(size.width),
+    Math.round(size.height),
+    GENERATION_SIZE_MULTIPLE
+  );
 
-  const sourceImageExport = await exportCroppedSourcePng(document, dataFolder, filePrefix, paddedBounds);
-  let selectionMask;
-
-  try {
-    selectionMask = await exportCroppedMaskPng(document, dataFolder, filePrefix, paddedBounds);
-  } catch (error) {
-    selectionMask = await exportBoundsMaskPng(document, dataFolder, filePrefix);
-    selectionMask.asset.fallbackReason = error.message || String(error);
-  }
+  const layerMaskData = await captureSoftFullDocumentMaskPixels(photoshop, document, qualitySettings);
+  const generationMaskData = await captureGenerationMaskData(document, generationBounds, qualitySettings);
+  const sourceImageExport = await exportCroppedSourcePng(document, dataFolder, filePrefix, generationBounds);
 
   return {
     assets: {
       sourceImage: sourceImageExport.asset,
-      selectionMask: selectionMask.asset
+      generationMask: summarizeMaskData(generationMaskData),
+      visibilityMask: summarizeMaskData(layerMaskData),
+      maskData: generationMaskData
     },
     files: {
-      sourceImage: sourceImageExport.file,
-      selectionMask: selectionMask.file
+      sourceImage: sourceImageExport.file
     },
-    cropBounds: paddedBounds
+    paddedBounds,
+    generationBounds,
+    cropBounds: generationBounds,
+    layerMaskData,
+    maskMetadata: {
+      generation: generationMaskData,
+      visibility: layerMaskData,
+      analysis: generationMaskData.analysis || layerMaskData?.analysis || { warnings: [] }
+    },
+    maskAnalysis: generationMaskData.analysis || layerMaskData?.analysis || { warnings: [] }
   };
 }
 
@@ -1124,7 +1274,7 @@ async function uploadComfyImage(file, role) {
     throw new Error(`ComfyUI upload failed for ${role}: HTTP ${response.status}`);
   }
 
-  const result = await response.json();
+  const result = await response.json().catch(() => ({}));
 
   return {
     role,
@@ -1134,14 +1284,65 @@ async function uploadComfyImage(file, role) {
   };
 }
 
-async function uploadAssetsToComfy(files) {
-  const sourceImage = await uploadComfyImage(files.sourceImage, "sourceImage");
-  const selectionMask = await uploadComfyImage(files.selectionMask, "selectionMask");
+function arrayBufferToBase64(buffer) {
+  let binary = "";
+  const bytes = new Uint8Array(buffer);
+  for (let i = 0; i < bytes.length; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
 
-  return {
-    sourceImage,
-    selectionMask
-  };
+async function uploadMaskViaEndpoint(maskData) {
+  if (!maskData || maskData.fallback) {
+    return null;
+  }
+
+  const pixelsB64 = arrayBufferToBase64(maskData.pixels.buffer);
+  const body = JSON.stringify({
+    pixels: pixelsB64,
+    sel_width: maskData.selWidth,
+    sel_height: maskData.selHeight,
+    full_width: maskData.fullWidth,
+    full_height: maskData.fullHeight,
+    sel_left: maskData.selLeft,
+    sel_top: maskData.selTop,
+    feather: maskData.feather
+  });
+
+  const response = await fetch(`${COMFYUI_BASE_URL}/rasterrelay/upload-selection`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(`Mask upload failed: ${errorData.error || `HTTP ${response.status}`}`);
+  }
+
+  return response.json();
+}
+
+async function uploadAssetsToComfy(files, maskData) {
+  const sourceImage = await uploadComfyImage(files.sourceImage, "sourceImage");
+
+  try {
+    const maskResult = await uploadMaskViaEndpoint(maskData);
+    const generationMaskUpload = {
+      role: "generationMask",
+      name: maskResult.name,
+      subfolder: maskResult.subfolder || "",
+      type: maskResult.type || "input"
+    };
+    return {
+      sourceImage,
+      generationMask: generationMaskUpload,
+      selectionMask: generationMaskUpload
+    };
+  } catch (error) {
+    throw new Error(`Could not upload mask to ComfyUI: ${error?.message || error}. Make sure ComfyUI is running and the rasterrelay_nodes package is installed.`);
+  }
 }
 
 async function loadWorkflowBundle() {
@@ -1182,78 +1383,6 @@ async function getComfyObjectInfo() {
   return response.json();
 }
 
-function extractLoraNamesFromObjectInfo(objectInfo) {
-  const loraInput = objectInfo?.LoraLoader?.input?.required?.lora_name;
-  const names = Array.isArray(loraInput?.[0]) ? loraInput[0] : [];
-  return names.filter((name) => typeof name === "string" && name.trim()).sort();
-}
-
-function addLoraNameToInput(name) {
-  const current = ui.loraNamesInput.value
-    .split(/[\n,]+/)
-    .map((item) => item.trim())
-    .filter(Boolean);
-
-  if (!current.some((item) => item.split(":")[0] === name)) {
-    current.push(name);
-  }
-
-  ui.loraNamesInput.value = current.join("\n");
-  refreshActiveLoraSummary();
-}
-
-function refreshActiveLoraSummary() {
-  if (!ui?.loraCatalogText) {
-    return;
-  }
-
-  const active = getLoraItems();
-  ui.loraCatalogText.textContent = active.length
-    ? `Aktywne LoRA: ${active.length}. Workflow użyje ich po kolei przez LoraLoader.`
-    : "LoRA: brak aktywnych. Workflow uruchomi się bez LoRA.";
-}
-
-function renderLoraCatalog(names) {
-  if (!ui?.loraList || !ui?.loraCatalogText) {
-    return;
-  }
-
-  ui.loraList.innerHTML = "";
-  refreshActiveLoraSummary();
-
-  if (!names.length) {
-    ui.loraList.textContent = "ComfyUI nie zwróciło listy LoRA. Możesz wpisać nazwę ręcznie.";
-    return;
-  }
-
-  names.slice(0, 24).forEach((name) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "lora-chip";
-    button.textContent = name;
-    button.addEventListener("click", () => addLoraNameToInput(name));
-    ui.loraList.appendChild(button);
-  });
-}
-
-async function refreshLoraCatalog() {
-  if (!ui?.loraCatalogText || !ui?.loraList) {
-    return;
-  }
-
-  ui.loraCatalogText.textContent = "LoRA: sprawdzam listę w ComfyUI...";
-
-  try {
-    const objectInfo = await getComfyObjectInfo();
-    const names = extractLoraNamesFromObjectInfo(objectInfo);
-    renderLoraCatalog(names);
-  } catch {
-    ui.loraCatalogText.textContent =
-      "LoRA: nie mogę pobrać listy z ComfyUI. Wpisz nazwę pliku ręcznie, jeśli ją znasz.";
-    ui.loraList.textContent = "";
-  }
-}
-
 function getWorkflowClassTypes(workflow) {
   return [...new Set(Object.values(workflow).map((node) => node.class_type).filter(Boolean))];
 }
@@ -1262,11 +1391,67 @@ function findMissingWorkflowClasses(workflow, objectInfo) {
   return getWorkflowClassTypes(workflow).filter((classType) => !objectInfo[classType]);
 }
 
+function getComfyNodeInputNames(nodeInfo) {
+  const input = nodeInfo?.input || {};
+  return new Set([
+    ...Object.keys(input.required || {}),
+    ...Object.keys(input.optional || {}),
+    ...Object.keys(input.hidden || {})
+  ]);
+}
+
+function findUnsupportedWorkflowInputs(workflow, objectInfo) {
+  const unsupported = [];
+
+  for (const [nodeId, node] of Object.entries(workflow)) {
+    const classType = node?.class_type;
+    const inputNames = getComfyNodeInputNames(objectInfo?.[classType]);
+
+    if (!classType || !classType.startsWith("RasterRelay") || inputNames.size === 0 || !node.inputs) {
+      continue;
+    }
+
+    for (const inputName of Object.keys(node.inputs)) {
+      if (!inputNames.has(inputName)) {
+        unsupported.push(`${nodeId}:${classType}.${inputName}`);
+      }
+    }
+  }
+
+  return unsupported;
+}
+
+function isMappingInputReady(input) {
+  if (Array.isArray(input)) {
+    return input.length > 0 && input.every(isMappingInputReady);
+  }
+
+  return Boolean(input?.nodeId && input?.inputName);
+}
+
 function validateWorkflowMapping(mapping) {
-  const requiredInputs = ["sourceImage", "selectionMask", "prompt"];
+  const requiredInputs = [
+    "sourceImage",
+    "selectionMask",
+    "prompt",
+    "negativePrompt",
+    "steps",
+    "cfg",
+    "seed",
+    "seedRandomize",
+    "lorasJson",
+    "width",
+    "height",
+    "cropLeft",
+    "cropTop",
+    "cropWidth",
+    "cropHeight",
+    "docWidth",
+    "docHeight"
+  ];
   const missingInputs = requiredInputs.filter((id) => {
     const input = mapping.inputs?.[id];
-    return !input?.nodeId || !input?.inputName;
+    return !isMappingInputReady(input);
   });
 
   if (missingInputs.length) {
@@ -1275,6 +1460,11 @@ function validateWorkflowMapping(mapping) {
 }
 
 function setWorkflowInput(workflow, mappingItem, value) {
+  if (panelHelpers.setWorkflowInput) {
+    panelHelpers.setWorkflowInput(workflow, mappingItem, value);
+    return;
+  }
+
   if (!mappingItem) {
     return;
   }
@@ -1311,81 +1501,66 @@ function updateWorkflowTargets(workflow, targets, source) {
 }
 
 function insertDynamicLoraChain(workflow, loraChain, loraItems) {
-  if (!loraChain || !loraItems.length) {
-    return false;
-  }
-
-  let modelSource = [loraChain.modelSource.nodeId, loraChain.modelSource.outputIndex ?? 0];
-  let clipSource = [loraChain.clipSource.nodeId, loraChain.clipSource.outputIndex ?? 0];
-
-  loraItems.forEach((lora) => {
-    const nodeId = getNextWorkflowNodeId(workflow);
-    workflow[nodeId] = {
-      class_type: "LoraLoader",
-      inputs: {
-        model: modelSource,
-        clip: clipSource,
-        lora_name: lora.name,
-        strength_model: lora.strengthModel,
-        strength_clip: lora.strengthClip
-      }
-    };
-
-    modelSource = [nodeId, 0];
-    clipSource = [nodeId, 1];
-  });
-
-  updateWorkflowTargets(workflow, loraChain.modelTargets, modelSource);
-  updateWorkflowTargets(workflow, loraChain.clipTargets, clipSource);
-  return true;
+  return false;
 }
 
 function applyWorkflowInputs(workflow, mapping, job, comfyUploads) {
   setWorkflowInput(workflow, mapping.inputs.sourceImage, comfyUploads.sourceImage.name);
   setWorkflowInput(workflow, mapping.inputs.selectionMask, comfyUploads.selectionMask.name);
-  setWorkflowInput(workflow, mapping.inputs.prompt, job.generation.prompt);
+  setWorkflowInput(workflow, mapping.inputs.prompt, job.generation.finalPrompt || job.generation.prompt);
+  setWorkflowInput(workflow, mapping.inputs.negativePrompt, job.generation.negativePrompt || "");
   setWorkflowInput(workflow, mapping.inputs.steps, job.generation.quality?.steps);
   setWorkflowInput(workflow, mapping.inputs.cfg, job.generation.quality?.cfg);
+  setWorkflowInput(workflow, mapping.inputs.seed, job.generation.activeSeed);
+  setWorkflowInput(workflow, mapping.inputs.seedRandomize, "disable");
 
-  if (job.cropBounds?.width && job.cropBounds?.height) {
-    setWorkflowInput(workflow, mapping.inputs.width, Math.round(job.cropBounds.width));
-    setWorkflowInput(workflow, mapping.inputs.height, Math.round(job.cropBounds.height));
+  if (job.cropBounds) {
+    setWorkflowInput(workflow, mapping.inputs.cropLeft, Math.round(job.cropBounds.left));
+    setWorkflowInput(workflow, mapping.inputs.cropTop, Math.round(job.cropBounds.top));
+    setWorkflowInput(workflow, mapping.inputs.cropWidth, Math.round(job.cropBounds.width));
+    setWorkflowInput(workflow, mapping.inputs.cropHeight, Math.round(job.cropBounds.height));
+  }
+  if (job.document?.width && job.document?.height) {
+    setWorkflowInput(workflow, mapping.inputs.docWidth, Math.round(job.document.width));
+    setWorkflowInput(workflow, mapping.inputs.docHeight, Math.round(job.document.height));
+  }
+
+  const genWidth = job.cropBounds?.width || job.document?.width;
+  const genHeight = job.cropBounds?.height || job.document?.height;
+  if (genWidth && genHeight) {
+    setWorkflowInput(workflow, mapping.inputs.width, Math.round(genWidth));
+    setWorkflowInput(workflow, mapping.inputs.height, Math.round(genHeight));
   }
 
   applyLoraWorkflowInputs(workflow, mapping, job.generation.lora.items);
 }
 
 function applyLoraWorkflowInputs(workflow, mapping, loraItems) {
-  if (insertDynamicLoraChain(workflow, mapping.loraChain, loraItems)) {
+  if (!mapping.inputs.lorasJson) {
     return;
   }
 
-  const loraSlots = Array.isArray(mapping.inputs.loras) ? mapping.inputs.loras : [];
+  const lorasJson = JSON.stringify(
+    loraItems.map((lora) => ({
+      name: lora.name,
+      strength_model: lora.strengthModel,
+      strength_clip: lora.strengthClip
+    }))
+  );
 
-  loraSlots.forEach((slot, index) => {
-    const lora = loraItems[index] || null;
-    const strengthModel = lora?.strengthModel ?? slot.emptyStrength ?? 0;
-    const strengthClip = lora?.strengthClip ?? slot.emptyStrength ?? 0;
-
-    setWorkflowInput(workflow, slot.name, lora?.name || slot.emptyName || "");
-    setWorkflowInput(workflow, slot.strengthModel, strengthModel);
-    setWorkflowInput(workflow, slot.strengthClip, strengthClip);
-  });
-
-  if (mapping.inputs.loraStrength) {
-    const firstLora = loraItems[0];
-    setWorkflowInput(workflow, mapping.inputs.loraStrength, firstLora?.strengthModel ?? 0);
-  }
-
-  if (mapping.inputs.loraName) {
-    const firstLora = loraItems[0];
-    setWorkflowInput(workflow, mapping.inputs.loraName, firstLora?.name || "");
-  }
+  setWorkflowInput(workflow, mapping.inputs.lorasJson, lorasJson);
 }
 
 async function queueComfyWorkflow(job, comfyUploads) {
   const { workflow, mapping } = await loadWorkflowBundle();
   applyWorkflowInputs(workflow, mapping, job, comfyUploads);
+  const objectInfo = await getComfyObjectInfo();
+  const unsupportedInputs = findUnsupportedWorkflowInputs(workflow, objectInfo);
+  if (unsupportedInputs.length) {
+    throw new Error(
+      `ComfyUI ma nieaktualne albo niezgodne custom nodes. Brakuje wejsc workflow: ${unsupportedInputs.join(", ")}. Zainstaluj ponownie RasterRelay nodes i zrestartuj ComfyUI.`
+    );
+  }
 
   const response = await fetch(`${COMFYUI_BASE_URL}/prompt`, {
     method: "POST",
@@ -1398,10 +1573,10 @@ async function queueComfyWorkflow(job, comfyUploads) {
     })
   });
 
-  const result = await response.json();
+  const result = await response.json().catch(() => ({}));
 
   if (!response.ok || result.error) {
-    throw new Error(`ComfyUI odrzuciło workflow: ${result.error || `HTTP ${response.status}`}`);
+    throw new Error(`ComfyUI odrzucilo workflow: ${formatComfyError(result.error) || `HTTP ${response.status}`}`);
   }
 
   return {
@@ -1409,6 +1584,51 @@ async function queueComfyWorkflow(job, comfyUploads) {
     number: result.number,
     nodeErrors: result.node_errors || null
   };
+}
+
+function formatComfyError(error) {
+  if (!error) {
+    return "";
+  }
+
+  if (typeof error === "string") {
+    return error;
+  }
+
+  if (error.message) {
+    return error.message;
+  }
+
+  if (error.details) {
+    return String(error.details);
+  }
+
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
+}
+
+function summarizeComfyHistoryFailure(entry) {
+  const status = entry?.status || {};
+  const messages = Array.isArray(status.messages) ? status.messages : [];
+  const errorMessages = messages
+    .map((message) => {
+      if (Array.isArray(message)) {
+        const payload = message[1] || {};
+        return payload.exception_message || payload.message || payload.node_type || message[0];
+      }
+
+      if (message && typeof message === "object") {
+        return message.exception_message || message.message || message.node_type;
+      }
+
+      return message;
+    })
+    .filter(Boolean);
+
+  return errorMessages.join(" | ") || status.status_str || "ComfyUI zakonczyl workflow bledem.";
 }
 
 function wait(milliseconds) {
@@ -1457,6 +1677,11 @@ async function waitForComfyOutput(promptId) {
       };
     }
 
+    const status = entry?.status?.status_str;
+    if (status === "error" || status === "failed") {
+      throw new Error(`ComfyUI zakonczyl workflow bledem: ${summarizeComfyHistoryFailure(entry)}`);
+    }
+
     await wait(COMFY_HISTORY_POLL_MS);
   }
 
@@ -1488,16 +1713,126 @@ async function downloadComfyImage(image, dataFolder) {
       kind: "comfyOutputImage",
       format: "png",
       path: file.nativePath || file.name,
+      width: image.width || null,
+      height: image.height || null,
+      alphaBBox: image.alpha_bbox || image.alphaBBox || null,
       comfy: {
         filename: image.filename,
         subfolder: image.subfolder || "",
-        type: image.type || "output"
+        type: image.type || "output",
+        width: image.width || null,
+        height: image.height || null,
+        alphaBBox: image.alpha_bbox || image.alphaBBox || null
       }
     }
   };
 }
 
-async function placeImageFileAsLayer(file, cropBounds) {
+function readBoundsObject(bounds) {
+  if (!bounds) {
+    return null;
+  }
+
+  const left = readUnitValue(bounds.left);
+  const top = readUnitValue(bounds.top);
+  const right = readUnitValue(bounds.right);
+  const bottom = readUnitValue(bounds.bottom);
+
+  if (![left, top, right, bottom].every(Number.isFinite)) {
+    return null;
+  }
+
+  return {
+    left,
+    top,
+    right,
+    bottom,
+    width: right - left,
+    height: bottom - top
+  };
+}
+
+function createExpectedPlacementGeometry(document, fileSize, outputMetadata = {}) {
+  const docSize = readDocumentSize(document);
+  const alphaBBox = outputMetadata.alphaBBox || outputMetadata.alpha_bbox || null;
+  const fallbackBounds = {
+    left: 0,
+    top: 0,
+    right: Math.round(docSize.width),
+    bottom: Math.round(docSize.height),
+    width: Math.round(docSize.width),
+    height: Math.round(docSize.height)
+  };
+  return {
+    document: {
+      width: Math.round(docSize.width),
+      height: Math.round(docSize.height)
+    },
+    png: {
+      width: fileSize?.width || outputMetadata.width || null,
+      height: fileSize?.height || outputMetadata.height || null
+    },
+    alphaBBox,
+    expectedBounds: alphaBBox || fallbackBounds,
+    actualBounds: null,
+    actualMatchesExpected: null,
+    matchesDocumentSize:
+      Math.round(fileSize?.width || 0) === Math.round(docSize.width) &&
+      Math.round(fileSize?.height || 0) === Math.round(docSize.height)
+  };
+}
+
+function boundsMatch(expected, actual, tolerance = 1) {
+  if (!expected || !actual) {
+    return null;
+  }
+
+  return ["left", "top", "right", "bottom"].every((key) => {
+    return Math.abs(Math.round(expected[key]) - Math.round(actual[key])) <= tolerance;
+  });
+}
+
+function boundsSizeMatches(expected, actual, tolerance = 2) {
+  if (!expected || !actual) {
+    return null;
+  }
+
+  return ["width", "height"].every((key) => {
+    return Math.abs(Math.round(expected[key]) - Math.round(actual[key])) <= tolerance;
+  });
+}
+
+async function alignLayerToExpectedBounds(activeLayer, placementGeometry) {
+  const expected = placementGeometry?.expectedBounds;
+  let actual = readBoundsObject(activeLayer?.bounds);
+
+  if (!expected || !actual || boundsMatch(expected, actual)) {
+    return actual;
+  }
+
+  if (boundsSizeMatches(expected, actual) === false) {
+    throw new Error(
+      `Warstwa wyniku ma rozmiar bounds ${JSON.stringify(actual)}, a oczekiwano ${JSON.stringify(expected)}. Photoshop prawdopodobnie przeskalowal wstawiany PNG.`
+    );
+  }
+
+  const dx = Math.round(expected.left - actual.left);
+  const dy = Math.round(expected.top - actual.top);
+  if (dx !== 0 || dy !== 0) {
+    await activeLayer.translate(dx, dy);
+  }
+
+  actual = readBoundsObject(activeLayer.bounds);
+  if (boundsMatch(expected, actual) === false) {
+    throw new Error(
+      `Nie udalo sie dopasowac pozycji warstwy wyniku. Po przesunieciu bounds=${JSON.stringify(actual)}, oczekiwano=${JSON.stringify(expected)}.`
+    );
+  }
+
+  return actual;
+}
+
+async function placeImageFileAsLayer(file, layerName = "RasterRelay - wynik", layerMaskData = null, outputMetadata = {}) {
   const photoshop = getPhotoshopApi();
   const uxp = getUxpApi();
 
@@ -1511,52 +1846,78 @@ async function placeImageFileAsLayer(file, cropBounds) {
     layerMask: {
       applied: false,
       source: "active-selection"
-    }
+    },
+    geometry: null
   };
+  const fileSize = await readPngDimensions(file);
+  placement.geometry = createExpectedPlacementGeometry(photoshop.app.activeDocument, fileSize, outputMetadata);
+
+  if (!placement.geometry.matchesDocumentSize) {
+    throw new Error(
+      `Wynik ComfyUI ma rozmiar ${fileSize.width} x ${fileSize.height}, a dokument ma ${placement.geometry.document.width} x ${placement.geometry.document.height}.`
+    );
+  }
 
   await photoshop.core.executeAsModal(
     async () => {
-      const capturedMask = await captureSoftSelectionMaskForLayer(photoshop);
-      if (capturedMask?.captured) {
-        await clearActiveSelection(photoshop);
-      }
+      try {
+        const capturedMask = layerMaskData
+          ? await createCapturedMaskFromPixels(photoshop, layerMaskData)
+          : await captureSoftSelectionMaskForLayer(photoshop);
 
-      await photoshop.action.batchPlay(
-        [
-          {
-            _obj: "placeEvent",
-            null: {
-              _path: token,
-              _kind: "local"
-            },
-            freeTransformCenterState: {
-              _enum: "quadCenterState",
-              _value: "QCSAverage"
-            },
-            offset: {
-              _obj: "offset",
-              horizontal: {
-                _unit: "pixelsUnit",
-                _value: cropBounds?.left ?? 0
+        await photoshop.action.batchPlay(
+          [
+            {
+              _obj: "placeEvent",
+              null: {
+                _path: token,
+                _kind: "local"
               },
-              vertical: {
-                _unit: "pixelsUnit",
-                _value: cropBounds?.top ?? 0
+              offset: {
+                _obj: "offset",
+                horizontal: {
+                  _unit: "pixelsUnit",
+                  _value: 0
+                },
+                vertical: {
+                  _unit: "pixelsUnit",
+                  _value: 0
+                }
               }
             }
-          }
-        ],
-        {}
-      );
+          ],
+          {}
+        );
 
-      placement.layerId = getActiveLayerId(photoshop);
-      const activeLayer = photoshop.app.activeDocument?.activeLayers?.[0];
-      if (activeLayer) {
-        activeLayer.name = "RasterRelay - wynik";
+        placement.layerId = getActiveLayerId(photoshop);
+        const activeLayer = photoshop.app.activeDocument?.activeLayers?.[0];
+        if (activeLayer) {
+          activeLayer.name = layerName;
+          placement.geometry.initialBounds = readBoundsObject(activeLayer.bounds);
+          placement.geometry.actualBounds = await alignLayerToExpectedBounds(activeLayer, placement.geometry);
+          placement.geometry.actualMatchesExpected = boundsMatch(
+            placement.geometry.expectedBounds,
+            placement.geometry.actualBounds
+          );
+          if (placement.geometry.actualMatchesExpected === false) {
+            throw new Error(
+              `Warstwa wyniku ma bounds ${JSON.stringify(placement.geometry.actualBounds)}, a oczekiwano ${JSON.stringify(placement.geometry.expectedBounds)}.`
+            );
+          }
+        }
+        placement.layerMask = capturedMask?.captured
+          ? await applyCapturedMaskToActiveLayer(photoshop, placement.layerId, capturedMask)
+          : await applySelectionMaskToActiveLayer(photoshop, placement.layerId);
+        if (!placement.layerMask?.applied) {
+          throw new Error(`Nie udało się nałożyć maski warstwy wyniku: ${placement.layerMask?.error || placement.layerMask?.fallback || "unknown error"}`);
+        }
+        await clearActiveSelection(photoshop);
+      } catch (error) {
+        if (placement.layerId) {
+          await deleteLayerById(photoshop, placement.layerId).catch(() => {});
+        }
+        throw error;
       }
-      placement.layerMask = capturedMask?.captured
-        ? await applyCapturedMaskToActiveLayer(photoshop, placement.layerId, capturedMask)
-        : await applySelectionMaskToActiveLayer(photoshop, placement.layerId);
     },
     { commandName: "RasterRelay Place Result Layer" }
   );
@@ -1637,7 +1998,17 @@ async function captureSoftSelectionMaskForLayer(photoshop) {
       }
     }
 
-    const imageData = await photoshop.imaging.createImageDataFromBuffer(fullMaskPixels, {
+    const featherRadius = getDefaultMaskFeatherRadius(docWidth, docHeight);
+    const softenedPixels = panelHelpers.softenGrayscaleMask
+      ? panelHelpers.softenGrayscaleMask(fullMaskPixels, docWidth, docHeight, featherRadius)
+      : blurMaskVertical(
+          blurMaskHorizontal(fullMaskPixels, docWidth, docHeight, featherRadius),
+          docWidth,
+          docHeight,
+          featherRadius
+        );
+
+    const imageData = await photoshop.imaging.createImageDataFromBuffer(softenedPixels, {
       width: docWidth,
       height: docHeight,
       components: 1,
@@ -1649,9 +2020,12 @@ async function captureSoftSelectionMaskForLayer(photoshop) {
     return {
       captured: true,
       source: "active-selection-before-place",
-      mode: "photoshop-selection-pixels-hard",
+      mode: "photoshop-selection-pixels-soft",
       imageData,
-      featherRadius: 0,
+      pixels: softenedPixels,
+      width: docWidth,
+      height: docHeight,
+      featherRadius,
       targetBounds: {
         left: 0,
         top: 0
@@ -1661,6 +2035,41 @@ async function captureSoftSelectionMaskForLayer(photoshop) {
   } finally {
     selectionImage.imageData?.dispose?.();
   }
+}
+
+async function createCapturedMaskFromPixels(photoshop, layerMaskData) {
+  if (!photoshop.imaging?.createImageDataFromBuffer || !layerMaskData?.pixels) {
+    return {
+      captured: false,
+      source: "saved-layer-mask-before-generation",
+      fallback: "saved-mask-unavailable"
+    };
+  }
+
+  const imageData = await photoshop.imaging.createImageDataFromBuffer(layerMaskData.pixels, {
+    width: layerMaskData.width,
+    height: layerMaskData.height,
+    components: 1,
+    chunky: false,
+    colorProfile: "Gray Gamma 2.2",
+    colorSpace: "Grayscale"
+  });
+
+  return {
+    captured: true,
+    source: "saved-selection-before-generation",
+    mode: layerMaskData.mode || "photoshop-selection-pixels-soft",
+    imageData,
+    pixels: layerMaskData.pixels,
+    width: layerMaskData.width,
+    height: layerMaskData.height,
+    featherRadius: layerMaskData.featherRadius,
+    targetBounds: {
+      left: 0,
+      top: 0
+    },
+    sourceBounds: layerMaskData.sourceBounds
+  };
 }
 
 async function clearActiveSelection(photoshop) {
@@ -1679,15 +2088,116 @@ async function clearActiveSelection(photoshop) {
   );
 }
 
-async function applyCapturedMaskToActiveLayer(photoshop, layerId, capturedMask) {
-  if (!photoshop.imaging?.putLayerMask || !capturedMask?.imageData) {
-    return {
-      applied: false,
-      source: capturedMask?.source || "captured-selection",
-      fallback: "captured-mask-unavailable"
-    };
+async function createGrayscaleImageData(photoshop, pixels, width, height) {
+  return await photoshop.imaging.createImageDataFromBuffer(new Uint8Array(pixels), {
+    width,
+    height,
+    components: 1,
+    chunky: false,
+    colorProfile: "Gray Gamma 2.2",
+    colorSpace: "Grayscale"
+  });
+}
+
+async function selectLayerById(photoshop, layerId) {
+  await photoshop.action.batchPlay(
+    [
+      {
+        _obj: "select",
+        _target: [{ _ref: "layer", _id: layerId }],
+        makeVisible: false
+      }
+    ],
+    {}
+  );
+}
+
+async function deleteLayerById(photoshop, layerId) {
+  await photoshop.action.batchPlay(
+    [
+      {
+        _obj: "delete",
+        _target: [{ _ref: "layer", _id: layerId }]
+      }
+    ],
+    {}
+  );
+}
+
+async function makeLayerMaskFromActiveSelection(photoshop, layerId) {
+  await selectLayerById(photoshop, layerId);
+  await photoshop.action.batchPlay(
+    [
+      {
+        _obj: "make",
+        new: { _class: "channel" },
+        at: {
+          _ref: "channel",
+          _enum: "channel",
+          _value: "mask"
+        },
+        using: {
+          _enum: "userMaskEnabled",
+          _value: "revealSelection"
+        }
+      }
+    ],
+    {}
+  );
+}
+
+async function restoreSelectionFromCapturedMask(photoshop, capturedMask) {
+  if (!photoshop.imaging?.putSelection || !capturedMask?.pixels) {
+    throw new Error("Photoshop imaging.putSelection is unavailable or captured mask pixels are missing.");
   }
 
+  const imageData = await createGrayscaleImageData(
+    photoshop,
+    capturedMask.pixels,
+    capturedMask.width,
+    capturedMask.height
+  );
+
+  try {
+    await photoshop.imaging.putSelection({
+      documentID: photoshop.app.activeDocument.id,
+      imageData,
+      replace: true,
+      targetBounds: capturedMask.targetBounds || { left: 0, top: 0 },
+      commandName: "RasterRelay Restore Selection For Layer Mask"
+    });
+  } finally {
+    imageData?.dispose?.();
+  }
+}
+
+async function verifyLayerMaskExists(photoshop, layerId) {
+  if (!photoshop.imaging?.getLayerMask) {
+    return true;
+  }
+
+  let maskImage = null;
+  try {
+    maskImage = await photoshop.imaging.getLayerMask({
+      documentID: photoshop.app.activeDocument.id,
+      layerID: layerId,
+      kind: "user",
+      sourceBounds: { left: 0, top: 0, right: 1, bottom: 1 }
+    });
+    return Boolean(maskImage?.imageData);
+  } catch {
+    return false;
+  } finally {
+    maskImage?.imageData?.dispose?.();
+  }
+}
+
+async function applyCapturedMaskToActiveLayer(photoshop, layerId, capturedMask) {
+  if (!photoshop.imaging?.putLayerMask || !capturedMask?.imageData) {
+    throw new Error("Photoshop imaging.putLayerMask is unavailable or captured mask image data is missing.");
+  }
+
+  let primaryError = null;
   try {
     await photoshop.imaging.putLayerMask({
       documentID: photoshop.app.activeDocument.id,
@@ -1699,6 +2209,10 @@ async function applyCapturedMaskToActiveLayer(photoshop, layerId, capturedMask) 
       commandName: "RasterRelay Apply Captured Selection Mask"
     });
 
+    if (!(await verifyLayerMaskExists(photoshop, layerId))) {
+      throw new Error("putLayerMask finished, but no user layer mask could be verified.");
+    }
+
     return {
       applied: true,
       source: capturedMask.source,
@@ -1707,12 +2221,28 @@ async function applyCapturedMaskToActiveLayer(photoshop, layerId, capturedMask) 
       targetBounds: capturedMask.sourceBounds
     };
   } catch (error) {
-    return {
-      applied: false,
-      source: capturedMask.source,
-      fallback: "captured-layer-mask-failed",
-      error: error.message || String(error)
-    };
+    primaryError = error;
+    try {
+      await restoreSelectionFromCapturedMask(photoshop, capturedMask);
+      await makeLayerMaskFromActiveSelection(photoshop, layerId);
+      if (!(await verifyLayerMaskExists(photoshop, layerId))) {
+        throw new Error("batchPlay fallback finished, but no user layer mask could be verified.");
+      }
+
+      return {
+        applied: true,
+        source: capturedMask.source,
+        mode: capturedMask.mode,
+        featherRadius: capturedMask.featherRadius,
+        targetBounds: capturedMask.sourceBounds,
+        fallback: "selection-batchplay-mask",
+        primaryError: primaryError.message || String(primaryError)
+      };
+    } catch (fallbackError) {
+      throw new Error(
+        `Mask application failed. putLayerMask: ${primaryError?.message || primaryError}. batchPlay fallback: ${fallbackError?.message || fallbackError}`
+      );
+    }
   } finally {
     capturedMask.imageData?.dispose?.();
   }
@@ -1724,21 +2254,13 @@ async function applySelectionMaskToActiveLayer(photoshop, layerId) {
     !photoshop.imaging?.getSelection ||
     !photoshop.imaging?.createImageDataFromBuffer
   ) {
-    return {
-      applied: false,
-      source: "active-selection",
-      fallback: "imaging-api-unavailable"
-    };
+    throw new Error("Photoshop imaging API is unavailable for layer-mask application.");
   }
 
   const document = photoshop.app.activeDocument;
   const selection = getSelectionInfo(document);
   if (!selection.hasSelection) {
-    return {
-      applied: false,
-      source: "active-selection",
-      fallback: "selection-missing"
-    };
+    throw new Error("Active Photoshop selection is missing; cannot create result layer mask.");
   }
 
   const docSize = readDocumentSize(document);
@@ -1785,7 +2307,17 @@ async function applySelectionMaskToActiveLayer(photoshop, layerId) {
       }
     }
 
-    hardMaskImageData = await photoshop.imaging.createImageDataFromBuffer(fullMaskPixels, {
+    const featherRadius = getDefaultMaskFeatherRadius(docWidth, docHeight);
+    const softenedPixels = panelHelpers.softenGrayscaleMask
+      ? panelHelpers.softenGrayscaleMask(fullMaskPixels, docWidth, docHeight, featherRadius)
+      : blurMaskVertical(
+          blurMaskHorizontal(fullMaskPixels, docWidth, docHeight, featherRadius),
+          docWidth,
+          docHeight,
+          featherRadius
+        );
+
+    hardMaskImageData = await photoshop.imaging.createImageDataFromBuffer(softenedPixels, {
       width: docWidth,
       height: docHeight,
       components: 1,
@@ -1807,38 +2339,39 @@ async function applySelectionMaskToActiveLayer(photoshop, layerId) {
       commandName: "RasterRelay Apply Selection Mask"
     });
 
+    if (!(await verifyLayerMaskExists(photoshop, layerId))) {
+      throw new Error("putLayerMask finished, but no user layer mask could be verified.");
+    }
+
     return {
       applied: true,
       source: "active-selection",
-      mode: "photoshop-selection-pixels-hard",
-      featherRadius: 0,
+      mode: "photoshop-selection-pixels-soft",
+      featherRadius,
       targetBounds: selectionImage.sourceBounds || selection.bounds
     };
   } catch (error) {
-    return {
-      applied: false,
-      source: "active-selection",
-      fallback: "selection-layer-mask-failed",
-      error: error.message || String(error)
-    };
+    throw new Error(`Selection layer-mask application failed: ${error.message || String(error)}`);
   } finally {
     hardMaskImageData?.dispose?.();
     selectionImage?.imageData?.dispose?.();
   }
 }
 
-async function receiveComfyResult(promptId, dataFolder, cropBounds) {
+async function receiveComfyResult(promptId, dataFolder, cropBounds, layerMaskData = null) {
   const output = await waitForComfyOutput(promptId);
   const downloaded = await downloadComfyImage(output.image, dataFolder);
 
   try {
-    const placement = await placeImageFileAsLayer(downloaded.file, cropBounds);
+    const placement = await placeImageFileAsLayer(downloaded.file, "RasterRelay - wynik", layerMaskData, downloaded.asset);
     downloaded.asset.photoshop = {
       placedAsLayer: true,
       layerMode: placement.layerMode,
       layerId: placement.layerId,
-      layerMask: placement.layerMask
+      layerMask: placement.layerMask,
+      placementGeometry: placement.geometry
     };
+    downloaded.asset.placementGeometry = placement.geometry;
   } catch (error) {
     downloaded.asset.photoshop = {
       placedAsLayer: false,
@@ -1870,13 +2403,33 @@ async function createInpaintingJobPackage() {
   }
 
   const dataFolder = await getDataFolder();
-  const exported = await exportInpaintingAssets(document, dataFolder);
-  const job = buildInpaintingJob(document, prompt, exported.assets, exported.cropBounds);
+  const qualitySettings = await loadQualitySettings();
+  const loraConfig = await loadLoraConfig();
+  const variantSeeds = createVariantSeeds(qualitySettings.variantCount);
+  const exported = await exportInpaintingAssets(document, dataFolder, qualitySettings);
+  const job = buildInpaintingJob(
+    document,
+    prompt,
+    exported.assets,
+    exported.cropBounds,
+    qualitySettings,
+    exported.maskMetadata,
+    variantSeeds,
+    loraConfig,
+    {
+      paddedBounds: exported.paddedBounds,
+      generationBounds: exported.generationBounds
+    }
+  );
   const savedPath = await saveJobPackage(job, dataFolder);
-  setMessage(`Paczka zadania została zapisana: ${savedPath}. Obraz i maska PNG są gotowe.`);
+  const warningText = job.generation.mask.warnings.length
+    ? ` Ostrzeżenia maski: ${job.generation.mask.warnings.join(" ")}`
+    : "";
+  setMessage(`Paczka zadania została zapisana: ${savedPath}. Obraz i maska PNG są gotowe.${warningText}`);
   return {
     job,
     files: exported.files,
+    layerMaskData: exported.layerMaskData,
     dataFolder,
     savedPath
   };
@@ -1896,7 +2449,7 @@ async function prepareInpaintingEdit() {
       return;
     }
 
-    const comfyUploads = await uploadAssetsToComfy(packageResult.files);
+    const comfyUploads = await uploadAssetsToComfy(packageResult.files, packageResult.job.assets.maskData);
     packageResult.job.comfy = {
       uploaded: true,
       uploads: comfyUploads,
@@ -1905,32 +2458,50 @@ async function prepareInpaintingEdit() {
     };
     await saveJobPackage(packageResult.job, packageResult.dataFolder);
 
-    const queuedWorkflow = await queueComfyWorkflow(packageResult.job, comfyUploads);
     packageResult.job.comfy.workflowQueued = true;
-    packageResult.job.comfy.queue = queuedWorkflow;
-    packageResult.job.comfy.note = "Workflow został wysłany do kolejki ComfyUI. Czekam na obraz wynikowy.";
-    await saveJobPackage(packageResult.job, packageResult.dataFolder);
+    packageResult.job.comfy.queues = [];
+    packageResult.job.outputs.resultImages = [];
 
-    const resultAsset = await receiveComfyResult(
-      queuedWorkflow.promptId,
-      packageResult.dataFolder,
-      packageResult.job.cropBounds
-    );
+    for (const variant of packageResult.job.generation.variants) {
+      packageResult.job.generation.activeSeed = variant.seed;
+      packageResult.job.comfy.note = `Workflow wariantu ${variant.index} został wysłany do kolejki ComfyUI.`;
+      const queuedWorkflow = await queueComfyWorkflow(packageResult.job, comfyUploads);
+      packageResult.job.comfy.queues.push({
+        ...queuedWorkflow,
+        variantIndex: variant.index,
+        seed: variant.seed
+      });
+      await saveJobPackage(packageResult.job, packageResult.dataFolder);
+
+      const resultAsset = await receiveComfyResult(
+        queuedWorkflow.promptId,
+        packageResult.dataFolder,
+        packageResult.job.cropBounds,
+        packageResult.layerMaskData
+      );
+      resultAsset.variantIndex = variant.index;
+      resultAsset.seed = variant.seed;
+      packageResult.job.outputs.resultImages.push(resultAsset);
+    }
+
+    const resultAsset = packageResult.job.outputs.resultImages[0];
     packageResult.job.outputs.resultImage = resultAsset;
-    const maskApplied = Boolean(resultAsset.photoshop?.layerMask?.applied);
-    packageResult.job.comfy.note = resultAsset.photoshop?.placedAsLayer
+    packageResult.job.placementGeometry = resultAsset?.placementGeometry || resultAsset?.photoshop?.placementGeometry || null;
+    const maskApplied = Boolean(resultAsset?.photoshop?.layerMask?.applied);
+    const placedCount = packageResult.job.outputs.resultImages.filter((image) => image.photoshop?.placedAsLayer).length;
+    packageResult.job.comfy.note = placedCount
       ? maskApplied
-        ? "Wynik ComfyUI został pobrany i wstawiony do Photoshopa jako nowa warstwa z maską."
-        : "Wynik ComfyUI został pobrany i wstawiony do Photoshopa jako nowa warstwa. Maska warstwy wymaga sprawdzenia."
-      : "Wynik ComfyUI został pobrany, ale nie udało się wstawić go automatycznie jako warstwy.";
+        ? `Pobrano ${packageResult.job.outputs.resultImages.length} wynik(i). Warstwy zostały wstawione do Photoshopa z maską.`
+        : `Pobrano ${packageResult.job.outputs.resultImages.length} wynik(i). Maska pierwszej warstwy wymaga sprawdzenia.`
+      : "Wyniki ComfyUI zostały pobrane, ale nie udało się wstawić ich automatycznie jako warstw.";
     await saveJobPackage(packageResult.job, packageResult.dataFolder);
 
     setMessage(
-      resultAsset.photoshop?.placedAsLayer
+      resultAsset?.photoshop?.placedAsLayer
         ? maskApplied
-          ? `Wynik ComfyUI pobrany i wstawiony jako nowa warstwa z maską. Prompt ID: ${queuedWorkflow.promptId}.`
-          : `Wynik ComfyUI pobrany i wstawiony jako nowa warstwa. Maska wymaga ręcznego sprawdzenia. Prompt ID: ${queuedWorkflow.promptId}.`
-        : `Wynik ComfyUI pobrany do pliku, ale nie udało się wstawić warstwy automatycznie: ${resultAsset.photoshop?.error}`
+          ? `Pobrano ${packageResult.job.outputs.resultImages.length} wynik(i) i wstawiono jako warstwy z maską.`
+          : `Pobrano ${packageResult.job.outputs.resultImages.length} wynik(i). Maska wymaga ręcznego sprawdzenia.`
+        : `Wyniki ComfyUI pobrane do plików, ale nie udało się wstawić warstw automatycznie: ${resultAsset?.photoshop?.error}`
     );
   } catch (error) {
     setMessage(`Nie udało się przygotować edycji: ${error.message || error}`);
@@ -1983,8 +2554,17 @@ async function checkRasterRelayReadiness() {
       return false;
     }
 
+    const unsupportedInputs = findUnsupportedWorkflowInputs(workflow, objectInfo);
+    if (unsupportedInputs.length) {
+      setMessage(
+        `ComfyUI ma nieaktualne RasterRelay nodes. Brakuje wejsc: ${unsupportedInputs.join(", ")}. Zainstaluj nodes ponownie i zrestartuj ComfyUI.`
+      );
+      return false;
+    }
+
     const quality = getQualityPreset();
-    const loraCount = getLoraItems().length;
+    const loraConfig = await loadLoraConfig();
+    const loraCount = (loraConfig?.loras || []).length;
     setMessage(
       `Gotowe do edycji. Jakość: ${quality.label}, kroki: ${quality.steps}, LoRA: ${loraCount}. Możesz kliknąć Przygotuj edycję.`
     );
@@ -2025,10 +2605,6 @@ function initializePanel(rootNode) {
     void runInpaintingEdit();
   });
 
-  ui.loraNamesInput.addEventListener("input", refreshActiveLoraSummary);
-  ui.loraStrengthModelInput.addEventListener("input", refreshActiveLoraSummary);
-  ui.loraStrengthClipInput.addEventListener("input", refreshActiveLoraSummary);
-
   if (ui.e2eSmokeButton) {
     ui.e2eSmokeButton.addEventListener("click", () => {
       void runE2ESmokeTest();
@@ -2036,7 +2612,6 @@ function initializePanel(rootNode) {
   }
 
   rootNode.__rasterRelayInitialized = true;
-  refreshActiveLoraSummary();
 
   window.setTimeout(() => {
     void runAutostartE2EIfRequested();
@@ -2071,8 +2646,106 @@ async function runE2ESmokeTest() {
   }
 }
 
+async function createGeometrySmokeDocument() {
+  const photoshop = getPhotoshopApi();
+  const testFile = await getPluginEntry(GEOMETRY_TEST_SOURCE_FILE_NAME);
+
+  await photoshop.core.executeAsModal(
+    async () => {
+      await photoshop.app.open(testFile);
+      await photoshop.action.batchPlay(
+        [
+          {
+            _obj: "set",
+            _target: [{ _ref: "channel", _property: "selection" }],
+            to: {
+              _obj: "ellipse",
+              top: { _unit: "pixelsUnit", _value: GEOMETRY_TEST_SELECTION.centerY - GEOMETRY_TEST_SELECTION.radiusY },
+              left: { _unit: "pixelsUnit", _value: GEOMETRY_TEST_SELECTION.centerX - GEOMETRY_TEST_SELECTION.radiusX },
+              bottom: { _unit: "pixelsUnit", _value: GEOMETRY_TEST_SELECTION.centerY + GEOMETRY_TEST_SELECTION.radiusY },
+              right: { _unit: "pixelsUnit", _value: GEOMETRY_TEST_SELECTION.centerX + GEOMETRY_TEST_SELECTION.radiusX }
+            }
+          }
+        ],
+        {}
+      );
+    },
+    { commandName: "RasterRelay Geometry Smoke Document" }
+  );
+
+  return photoshop.app.activeDocument;
+}
+
+async function runGeometrySmokeTest() {
+  const dataFolder = await getDataFolder();
+  const qualitySettings = await loadQualitySettings();
+  const document = await createGeometrySmokeDocument();
+  const exported = await exportInpaintingAssets(document, dataFolder, qualitySettings);
+  const report = {
+    ok: true,
+    test: "manual-export-geometry",
+    document: readDocumentSize(document),
+    selection: getSelectionInfo(document),
+    paddedBounds: exported.paddedBounds,
+    generationBounds: exported.generationBounds,
+    cropBounds: exported.cropBounds,
+    sourceImage: exported.assets.sourceImage,
+    mask: {
+      role: exported.assets.generationMask?.role || "generationMask",
+      width: exported.assets.maskData.selWidth,
+      height: exported.assets.maskData.selHeight,
+      options: exported.assets.generationMask?.options || null,
+      warnings: exported.maskAnalysis?.warnings || []
+    },
+    layerMask: exported.layerMaskData
+      ? {
+          role: exported.layerMaskData.role || "visibilityMask",
+          width: exported.layerMaskData.width,
+          height: exported.layerMaskData.height,
+          options: exported.layerMaskData.options || null,
+          warnings: exported.layerMaskData.analysis?.warnings || []
+        }
+      : null,
+    checks: {
+      sourceMatchesCrop:
+        exported.assets.sourceImage.width === exported.cropBounds.width &&
+        exported.assets.sourceImage.height === exported.cropBounds.height,
+      maskMatchesCrop:
+        exported.assets.maskData.selWidth === exported.cropBounds.width &&
+        exported.assets.maskData.selHeight === exported.cropBounds.height,
+      layerMaskMatchesDocument:
+        !exported.layerMaskData ||
+        (exported.layerMaskData.width === Math.round(readDocumentSize(document).width) &&
+          exported.layerMaskData.height === Math.round(readDocumentSize(document).height)),
+      cropMatchesGeneration:
+        exported.cropBounds.width === exported.generationBounds.width &&
+        exported.cropBounds.height === exported.generationBounds.height
+    }
+  };
+
+  const reportFile = await dataFolder.createFile(`rasterrelay-geometry-smoke-${createSafeTimestamp()}.json`, {
+    overwrite: true
+  });
+  await reportFile.write(JSON.stringify(report, null, 2));
+  setMessage(
+    report.checks.sourceMatchesCrop && report.checks.maskMatchesCrop
+      ? `Test geometrii OK: source i maska maja rozmiar cropu ${exported.cropBounds.width} x ${exported.cropBounds.height}.`
+      : "Test geometrii wykryl rozjazd rozmiarow source/maski."
+  );
+  console.log(JSON.stringify(report));
+  return report;
+}
+
 async function runAutostartE2EIfRequested() {
   if (autostartE2EConsumed) {
+    return;
+  }
+
+  const geometryFlag = await getOptionalPluginTextFile(GEOMETRY_AUTOSTART_FILE_NAME);
+  if (geometryFlag) {
+    autostartE2EConsumed = true;
+    await removeOptionalPluginFile(GEOMETRY_AUTOSTART_FILE_NAME);
+    await runGeometrySmokeTest();
     return;
   }
 
@@ -2082,6 +2755,7 @@ async function runAutostartE2EIfRequested() {
   }
 
   autostartE2EConsumed = true;
+  await removeOptionalPluginFile(E2E_AUTOSTART_FILE_NAME);
   await runE2ESmokeTest();
 }
 
@@ -2114,6 +2788,11 @@ if (uxpApi?.entrypoints) {
       runE2ESmokeTest: {
         run() {
           return runE2ESmokeTest();
+        }
+      },
+      runGeometrySmokeTest: {
+        run() {
+          return runGeometrySmokeTest();
         }
       }
     }

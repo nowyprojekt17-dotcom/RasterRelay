@@ -39,14 +39,14 @@
   "31": {
     "class_type": "CLIPTextEncode",
     "inputs": {
-      "clip": ["30", 0],
+      "clip": ["90", 1],
       "text": "RasterRelay inpainting"
     }
   },
   "32": {
     "class_type": "CLIPTextEncode",
     "inputs": {
-      "clip": ["30", 0],
+      "clip": ["90", 1],
       "text": ""
     }
   },
@@ -108,7 +108,7 @@
   "63": {
     "class_type": "CFGGuider",
     "inputs": {
-      "model": ["21", 0],
+      "model": ["90", 0],
       "positive": ["51", 0],
       "negative": ["52", 0],
       "cfg": 1
@@ -131,22 +131,43 @@
       "vae": ["40", 0]
     }
   },
-  "66": {
-    "class_type": "ImageCompositeMasked",
+  "80": {
+    "class_type": "RasterRelaySaveImage",
     "inputs": {
-      "destination": ["10", 0],
-      "source": ["65", 0],
-      "mask": ["11", 0],
-      "x": 0,
-      "y": 0,
-      "resize_source": false
+      "images": ["91", 0],
+      "filename_prefix": "RasterRelay/inpainting"
     }
   },
-  "80": {
-    "class_type": "SaveImage",
+  "90": {
+    "class_type": "RasterRelayLoraStack",
     "inputs": {
-      "images": ["66", 0],
-      "filename_prefix": "RasterRelay/inpainting"
+      "model": ["21", 0],
+      "clip": ["30", 0],
+      "loras_json": "[]"
+    }
+  },
+  "91": {
+    "class_type": "RasterRelayPadToDocument",
+    "inputs": {
+      "image": ["94", 0],
+      "mask": ["11", 0],
+      "crop_left": 0,
+      "crop_top": 0,
+      "crop_width": 1024,
+      "crop_height": 1024,
+      "doc_width": 1024,
+      "doc_height": 1024,
+      "alpha_mode": "crop"
+    }
+  },
+  "94": {
+    "class_type": "RasterRelayVaeDriftMatch",
+    "inputs": {
+      "original_crop": ["10", 0],
+      "generated_crop": ["65", 0],
+      "mask": ["11", 0],
+      "blend_radius": 0,
+      "restore_unmasked": true
     }
   }
 }

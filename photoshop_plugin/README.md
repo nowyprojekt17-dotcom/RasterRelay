@@ -85,7 +85,7 @@ Przykładowy format jest opisany w `workflows/inpainting/job-contract.v1.json`.
 
 Podstawowa droga używa `imaging.getSelection`, czyli pikselowej reprezentacji zaznaczenia Photoshopa. To jest właściwy kierunek dla jakości, bo maska może zachować nieregularny kształt i miękkie krawędzie.
 
-Jeśli dana wersja Photoshopa odmówi tej operacji, panel awaryjnie zapisze prostokąt z granic zaznaczenia i dopisze powód w polu `fallbackReason`.
+Jeśli dana wersja Photoshopa odmówi odczytu maski przez Imaging API, panel zatrzyma zadanie z jasnym błędem. Nie tworzymy już prostokątnej maski awaryjnej, bo taka maska może dać twarde, sztuczne krawędzie.
 
 ## Workflow ComfyUI
 

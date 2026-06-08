@@ -1,0 +1,15 @@
+[project]
+name = "rasterrelay-nodes"
+version = "0.1.0"
+description = "ComfyUI custom nodes for RasterRelay Photoshop integration"
+requires-python = ">=3.10"
+dependencies = [
+    "torch",
+    "numpy",
+    "Pillow",
+    "aiohttp",
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.backends._legacy:_Backend"

@@ -1,6 +1,6 @@
 {
   "status": "ready",
-  "description": "RasterRelay Flux.2 Klein 9B GGUF hybrid workflow: ReferenceLatent for full-image context + SetLatentNoiseMask for masked-only generation.",
+  "description": "RasterRelay Flux.2 Klein 9B GGUF hybrid workflow with RasterRelay custom nodes.",
   "inputs": {
     "sourceImage": {
       "nodeId": "10",
@@ -22,6 +22,22 @@
       "nodeId": "63",
       "inputName": "cfg"
     },
+    "negativePrompt": {
+      "nodeId": "32",
+      "inputName": "text"
+    },
+    "seed": {
+      "nodeId": "60",
+      "inputName": "noise_seed"
+    },
+    "seedRandomize": {
+      "nodeId": "60",
+      "inputName": "randomize_seed"
+    },
+    "lorasJson": {
+      "nodeId": "90",
+      "inputName": "loras_json"
+    },
     "width": [
       {
         "nodeId": "21",
@@ -41,40 +57,43 @@
         "nodeId": "62",
         "inputName": "height"
       }
-    ]
-  },
-  "loraChain": {
-    "modelSource": {
-      "nodeId": "21",
-      "outputIndex": 0
-    },
-    "clipSource": {
-      "nodeId": "30",
-      "outputIndex": 0
-    },
-    "modelTargets": [
-      {
-        "nodeId": "63",
-        "inputName": "model"
-      }
     ],
-    "clipTargets": [
-      {
-        "nodeId": "31",
-        "inputName": "clip"
-      },
-      {
-        "nodeId": "32",
-        "inputName": "clip"
-      }
-    ]
+    "cropLeft": {
+      "nodeId": "91",
+      "inputName": "crop_left"
+    },
+    "cropTop": {
+      "nodeId": "91",
+      "inputName": "crop_top"
+    },
+    "cropWidth": {
+      "nodeId": "91",
+      "inputName": "crop_width"
+    },
+    "cropHeight": {
+      "nodeId": "91",
+      "inputName": "crop_height"
+    },
+    "docWidth": {
+      "nodeId": "91",
+      "inputName": "doc_width"
+    },
+    "docHeight": {
+      "nodeId": "91",
+      "inputName": "doc_height"
+    }
   },
   "notes": {
     "baseModel": "flux-2-klein-9b-Q4_K_M.gguf",
     "textEncoder": "qwen_3_8b_fp8mixed.safetensors",
     "vae": "flux2-vae.safetensors",
-    "maskChannel": "LoadImageMask red channel",
-    "architecture": "Hybrid: ReferenceLatent (context) + SetLatentNoiseMask (masked generation)",
-    "cfg": "1 recommended for FLUX models"
+    "maskChannel": "LoadImageMask red channel. Plugin uploads the generation/denoise support mask; Photoshop layer visibility mask is applied separately.",
+    "architecture": "Hybrid: ReferenceLatent + SetLatentNoiseMask + RasterRelay custom nodes. Dual-mask handoff is used; no automatic color/tonal harmonization is applied.",
+    "cfg": "1 recommended for FLUX models",
+    "customNodes": {
+      "90": "RasterRelayLoraStack - JSON-driven LoRA chain",
+      "91": "RasterRelayPadToDocument - pads full generated crop to full doc size with crop alpha",
+      "94": "RasterRelayVaeDriftMatch - restores unmasked original pixels without pre-feathering layer content"
+    }
   }
 }

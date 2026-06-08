@@ -12,3 +12,18 @@ launcher/src-tauri/target/
 # Local machine noise
 .DS_Store
 Thumbs.db
+**/__pycache__/
+*.py[cod]
+.understand-anything/
+
+# RasterRelay local test triggers and temporary reports
+photoshop_plugin/e2e-autostart.flag
+photoshop_plugin/geometry-autostart.flag
+photoshop_plugin/*.log
+photoshop_plugin/rasterrelay-quality-settings.json
+photoshop_plugin/rasterrelay-lora-config.json
+Testy/Wyniki testów/
+Testy/Wyniki testĂłw/
+Testy/Wyniki testłółw/
+Testy/Wyniki testów/*.tmp
+Testy/Wyniki testów/*.log

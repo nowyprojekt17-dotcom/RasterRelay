@@ -29,18 +29,23 @@
       "format": "png",
       "path": "C:\\Users\\Mierz\\AppData\\Roaming\\Adobe\\UXP\\PluginsStorage\\...\\rasterrelay-2026-05-31T12-00-00-000Z-source.png"
     },
-    "selectionMask": {
-      "kind": "selectionMask",
+    "generationMask": {
+      "kind": "generationMask",
       "format": "png",
       "path": "C:\\Users\\Mierz\\AppData\\Roaming\\Adobe\\UXP\\PluginsStorage\\...\\rasterrelay-2026-05-31T12-00-00-000Z-mask-selection.png",
-      "mode": "photoshop-selection-pixels",
+      "mode": "processed-crop-selection-mask",
       "sourceBounds": {
         "left": 256,
         "top": 256,
         "right": 768,
         "bottom": 768
       },
-      "note": "Maska została utworzona z pikselowej reprezentacji zaznaczenia Photoshopa."
+      "note": "Maska generacji jest wysyłana do ComfyUI i może mieć dodatkowy miękki halo."
+    },
+    "visibilityMask": {
+      "kind": "visibilityMask",
+      "mode": "photoshop-selection-pixels-soft",
+      "note": "Maska widoczności jest nakładana lokalnie jako maska warstwy Photoshopa."
     }
   },
   "generation": {

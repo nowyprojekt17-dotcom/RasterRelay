@@ -25,7 +25,7 @@ Na teraz paczka zawiera:
 - aktywny dokument,
 - granice zaznaczenia,
 - plik PNG z aktywnego dokumentu,
-- maskę PNG z pikseli zaznaczenia Photoshopa,
+- maskę PNG generacji dla ComfyUI oraz osobną maskę widoczności warstwy Photoshopa,
 - prompt,
 - informację, że bazowy model jest GGUF,
 - miejsce na jedną albo kilka LoRA i ich siłę,
@@ -66,7 +66,9 @@ W panelu Photoshopa jest podobny, lżejszy przycisk `Sprawdź gotowość`. On ni
 
 Panel próbuje tworzyć maskę przez `imaging.getSelection`, czyli przez pikselową reprezentację aktywnego zaznaczenia. To jest lepsze od prostokąta, bo zachowuje nieregularny kształt i miękkie krawędzie.
 
-Jeśli Photoshop nie pozwoli odczytać selekcji przez Imaging API, panel zapisze awaryjną maskę prostokątną i dopisze `fallbackReason` w paczce zadania. Taki fallback służy tylko do diagnozy i nie jest docelową jakością.
+RasterRelay używa teraz dwóch ról maski. `selectionMask` w mappingu workflow jest maską generacji wysyłaną do `LoadImageMask -> SetLatentNoiseMask`; plugin automatycznie dodaje jej miękki halo zależny od jakości, żeby FLUX.2 Klein miał kontekst przejścia. Maska warstwy Photoshopa jest przechowywana osobno jako `layerMaskData` i kontroluje finalną widoczność wyniku.
+
+Jeśli Photoshop nie pozwoli odczytać selekcji przez Imaging API, panel ma przerwać zadanie i pokazać jasny błąd. Nie używamy już prostokątnej maski awaryjnej, bo może dać twardą krawędź i fałszywy wynik testu.
 
 ## Kolejka ComfyUI
 

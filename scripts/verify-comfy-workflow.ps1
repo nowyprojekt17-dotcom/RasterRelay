@@ -16,6 +16,49 @@ function Read-JsonFile {
     Get-Content -Path $Path -Raw | ConvertFrom-Json
 }
 
+function Assert-PngHasAlpha {
+    param(
+        [string]$Path,
+        [int]$CropLeft = 0,
+        [int]$CropTop = 0,
+        [int]$CropSize = 0
+    )
+
+    Add-Type -AssemblyName System.Drawing
+    $image = [System.Drawing.Bitmap]::FromFile($Path)
+    try {
+        $format = $image.PixelFormat
+        $hasAlpha = $format -eq "Format32bppArgb" -or $format -eq "Format64bppArgb"
+        if (-not $hasAlpha) {
+            throw "Wynik ($format) nie ma kanału alfa. RasterRelaySaveImage powinien zapisywac PNG RGBA."
+        }
+
+        $w = $image.Width
+        $h = $image.Height
+
+        $checkPoints = @()
+
+        if ($CropSize -gt 0 -and $CropSize -lt $w -and $CropSize -lt $h) {
+            $rightAfterCrop = [Math]::Min($CropLeft + $CropSize + 30, $w - 1)
+            $bottomAfterCrop = [Math]::Min($CropTop + $CropSize + 30, $h - 1)
+            $checkPoints += @{ x = $rightAfterCrop; y = $CropTop + 10; label = "po prawej cropu" }
+            $checkPoints += @{ x = $CropLeft + 10; y = $bottomAfterCrop; label = "pod cropem" }
+        } else {
+            $checkPoints += @{ x = $w - 2; y = 1; label = "prawy gorny" }
+            $checkPoints += @{ x = 1; y = $h - 2; label = "lewy dolny" }
+        }
+
+        foreach ($c in $checkPoints) {
+            $pixel = $image.GetPixel($c.x, $c.y)
+            if ($pixel.A -gt 8) {
+                throw "Punkt $($c.label) ($($c.x),$($c.y)) ma alpha=$($pixel.A). RasterRelayPadToDocument powinien zostawic przezroczystosc poza cropem."
+            }
+        }
+    } finally {
+        $image.Dispose()
+    }
+}
+
 function ConvertTo-Hashtable {
     param([Parameter(ValueFromPipeline)]$InputObject)
 
@@ -189,6 +232,9 @@ if (-not $firstImage) {
 }
 
 $resultPath = Join-Path (Join-Path $outputDir $firstImage.subfolder) $firstImage.filename
+
+Write-Step "Weryfikuję kanał alfa w pliku wynikowym."
+Assert-PngHasAlpha -Path $resultPath -CropLeft $workflow["91"].inputs.crop_left -CropTop $workflow["91"].inputs.crop_top -CropSize 256
 
 Write-Step "SUKCES. Wynik testowy: $resultPath"
 Write-Step "Ten test sprawdza ComfyUI i workflow. Ostatni etap nadal wymaga Photoshopa Beta 27.8."

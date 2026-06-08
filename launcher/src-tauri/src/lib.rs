@@ -16,6 +16,9 @@ const UXP_CLI_PORT: u16 = 14001;
 const PHOTOSHOP_BETA_EXE: &str = r"C:\Program Files\Adobe\Adobe Photoshop (Beta)\Photoshop.exe";
 const UXP_DEVELOPER_TOOLS_EXE: &str =
     r"C:\Program Files\Adobe\Adobe UXP Developer Tools\Adobe UXP Developer Tools.exe";
+const REQUIRED_GGUF_MODEL: &str = "flux-2-klein-9b-Q4_K_M.gguf";
+const REQUIRED_TEXT_ENCODER: &str = "qwen_3_8b_fp8mixed.safetensors";
+const REQUIRED_VAE: &str = "flux2-vae.safetensors";
 
 struct ComfyProcessState {
     child: Mutex<Option<Child>>,
@@ -151,6 +154,23 @@ struct WorkflowFileValidation {
     will_replace_existing: bool,
 }
 
+struct AssetValidationContext {
+    kind: String,
+    source_path: String,
+    target_dir: PathBuf,
+    target_path: PathBuf,
+    file_name: String,
+    target_dir_exists: bool,
+}
+
+struct WorkflowFileValidationContext {
+    kind: String,
+    source_path: String,
+    target_path: PathBuf,
+    file_name: String,
+    will_replace_existing: bool,
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ComfyRuntimeStatus {
@@ -238,6 +258,33 @@ struct RasterRelayEnvironmentStartResult {
     uxp_developer_tools: EnvironmentStepStatus,
     plugin: EnvironmentStepStatus,
     message: String,
+}
+
+#[derive(Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct QualitySettings {
+    schema_version: String,
+    task_mode: String,
+    quality: String,
+    mask_feather_px: i32,
+    mask_grow_px: i32,
+    variant_count: u8,
+    negative_prompt: String,
+}
+
+#[derive(Deserialize, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct LoraEntry {
+    name: String,
+    strength_model: f64,
+    strength_clip: f64,
+}
+
+#[derive(Deserialize, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct LoraConfig {
+    schema_version: String,
+    loras: Vec<LoraEntry>,
 }
 
 #[tauri::command]
@@ -374,6 +421,114 @@ fn install_workflow_file(source_path: String, kind: WorkflowFileKind) -> AssetIn
             success: false,
             destination_path: Some(path_text(&target_path)),
             message: format!("Nie udało się skopiować pliku workflow: {error}"),
+        },
+    }
+}
+
+#[tauri::command]
+fn get_quality_settings() -> QualitySettings {
+    read_quality_settings().unwrap_or_else(default_quality_settings)
+}
+
+#[tauri::command]
+fn save_quality_settings(settings: QualitySettings) -> AssetInstallResult {
+    let normalized = normalize_quality_settings(settings);
+    let path = quality_settings_path();
+    let Some(parent) = path.parent() else {
+        return AssetInstallResult {
+            success: false,
+            destination_path: None,
+            message: "Nie udało się odczytać folderu ustawień jakości.".to_string(),
+        };
+    };
+
+    if let Err(error) = fs::create_dir_all(parent) {
+        return AssetInstallResult {
+            success: false,
+            destination_path: None,
+            message: format!("Nie udało się utworzyć folderu ustawień jakości: {error}"),
+        };
+    }
+
+    match serde_json::to_string_pretty(&normalized)
+        .map_err(|error| error.to_string())
+        .and_then(|text| fs::write(&path, text).map_err(|error| error.to_string()))
+    {
+        Ok(_) => AssetInstallResult {
+            success: true,
+            destination_path: Some(path_text(&path)),
+            message: "Ustawienia jakości zostały zapisane dla panelu Photoshop.".to_string(),
+        },
+        Err(error) => AssetInstallResult {
+            success: false,
+            destination_path: Some(path_text(&path)),
+            message: format!("Nie udało się zapisać ustawień jakości: {error}"),
+        },
+    }
+}
+
+#[tauri::command]
+fn list_lora_files(comfyui_path: String) -> Vec<String> {
+    let loras_path = PathBuf::from(comfyui_path).join("models").join("loras");
+    if !loras_path.is_dir() {
+        return vec![];
+    }
+    let Ok(entries) = fs::read_dir(&loras_path) else {
+        return vec![];
+    };
+    let mut names: Vec<String> = entries
+        .flatten()
+        .filter_map(|entry| {
+            let path = entry.path();
+            if path.is_file()
+                && has_extension(&path, &["safetensors", "pt", "ckpt", "bin"])
+            {
+                path.file_name()?.to_str().map(str::to_string)
+            } else {
+                None
+            }
+        })
+        .collect();
+    names.sort();
+    names
+}
+
+#[tauri::command]
+fn get_lora_config() -> LoraConfig {
+    read_lora_config().unwrap_or_else(default_lora_config)
+}
+
+#[tauri::command]
+fn save_lora_config(config: LoraConfig) -> AssetInstallResult {
+    let normalized = normalize_lora_config(config);
+    let path = lora_config_path();
+    let Some(parent) = path.parent() else {
+        return AssetInstallResult {
+            success: false,
+            destination_path: None,
+            message: "Nie udało się odczytać folderu konfiguracji LoRA.".to_string(),
+        };
+    };
+    if let Err(error) = fs::create_dir_all(parent) {
+        return AssetInstallResult {
+            success: false,
+            destination_path: None,
+            message: format!("Nie udało się utworzyć folderu konfiguracji LoRA: {error}"),
+        };
+    }
+    match serde_json::to_string_pretty(&normalized)
+        .map_err(|error| error.to_string())
+        .and_then(|text| fs::write(&path, text).map_err(|error| error.to_string()))
+    {
+        Ok(_) => AssetInstallResult {
+            success: true,
+            destination_path: Some(path_text(&path)),
+            message: "Konfiguracja LoRA została zapisana dla panelu Photoshop.".to_string(),
+        },
+        Err(error) => AssetInstallResult {
+            success: false,
+            destination_path: Some(path_text(&path)),
+            message: format!("Nie udało się zapisać konfiguracji LoRA: {error}"),
         },
     }
 }
@@ -886,6 +1041,11 @@ pub fn run() {
             install_asset,
             validate_workflow_file_install,
             install_workflow_file,
+            get_quality_settings,
+            save_quality_settings,
+            list_lora_files,
+            get_lora_config,
+            save_lora_config,
             get_comfyui_runtime_status,
             start_comfyui,
             stop_comfyui,
@@ -907,8 +1067,16 @@ fn build_found_report(root: PathBuf, candidates: Vec<PathBuf>) -> ReadinessRepor
     let loras_path = models_path.join("loras");
     let diffusion_models_path = models_path.join("diffusion_models");
     let unet_path = models_path.join("unet");
+    let clip_path = models_path.join("clip");
     let text_encoders_path = models_path.join("text_encoders");
+    let vae_path = models_path.join("vae");
     let rasterrelay_nodes_path = custom_nodes_path.join("rasterrelay_nodes");
+    let required_gguf_path = unet_path.join(REQUIRED_GGUF_MODEL);
+    let required_text_encoder_paths = [
+        text_encoders_path.join(REQUIRED_TEXT_ENCODER),
+        clip_path.join(REQUIRED_TEXT_ENCODER),
+    ];
+    let required_vae_path = vae_path.join(REQUIRED_VAE);
 
     let custom_nodes = count_direct_child_dirs(&custom_nodes_path);
     let loras =
@@ -1000,6 +1168,15 @@ fn build_found_report(root: PathBuf, candidates: Vec<PathBuf>) -> ReadinessRepor
             true,
         ),
         folder_item(
+            "clip-models",
+            "CLIP / text encoders",
+            &clip_path,
+            "Folder clip jest na miejscu. Ten folder jest używany przez lokalny CLIPLoader.",
+            "Brakuje folderu models/clip.",
+            Some("Add"),
+            false,
+        ),
+        folder_item(
             "text-encoders",
             "Text encoders",
             &text_encoders_path,
@@ -1007,6 +1184,39 @@ fn build_found_report(root: PathBuf, candidates: Vec<PathBuf>) -> ReadinessRepor
             "Brakuje folderu models/text_encoders.",
             Some("Add"),
             false,
+        ),
+        folder_item(
+            "vae-models",
+            "VAE",
+            &vae_path,
+            "Folder vae jest na miejscu.",
+            "Brakuje folderu models/vae.",
+            Some("Add"),
+            false,
+        ),
+        file_item(
+            "required-gguf-model",
+            "Model bazowy GGUF",
+            &required_gguf_path,
+            &format!("Znaleziono wymagany model: {REQUIRED_GGUF_MODEL}."),
+            &format!("Brakuje wymaganego modelu: {REQUIRED_GGUF_MODEL}."),
+            true,
+        ),
+        file_any_item(
+            "required-text-encoder",
+            "Text encoder FLUX.2",
+            &required_text_encoder_paths,
+            &format!("Znaleziono wymagany text encoder: {REQUIRED_TEXT_ENCODER}."),
+            &format!("Brakuje wymaganego text encodera: {REQUIRED_TEXT_ENCODER} w models/text_encoders albo models/clip."),
+            true,
+        ),
+        file_item(
+            "required-vae",
+            "VAE FLUX.2",
+            &required_vae_path,
+            &format!("Znaleziono wymagane VAE: {REQUIRED_VAE}."),
+            &format!("Brakuje wymaganego VAE: {REQUIRED_VAE}."),
+            true,
         ),
         item(
             "rasterrelay-nodes",
@@ -1274,91 +1484,69 @@ fn validate_asset_install_paths(
         target_dir.join(&file_name)
     };
     let target_dir_exists = target_dir.is_dir();
+    let context = AssetValidationContext {
+        kind: kind_label,
+        source_path: source_path_text,
+        target_dir,
+        target_path,
+        file_name,
+        target_dir_exists,
+    };
 
     if !looks_like_comfyui(&comfyui_path) {
         return asset_validation(
-            kind_label,
-            source_path_text,
-            target_dir,
-            target_path,
-            file_name,
+            &context,
             "błąd",
             "Najpierw wybierz poprawny folder ComfyUI z plikiem main.py.",
             false,
-            target_dir_exists,
         );
     }
 
     if !source_path.is_file() {
         return asset_validation(
-            kind_label,
-            source_path_text,
-            target_dir,
-            target_path,
-            file_name,
+            &context,
             "błąd",
             "Wybrana ścieżka nie jest plikiem.",
             false,
-            target_dir_exists,
         );
     }
 
-    if file_name.is_empty() {
+    if context.file_name.is_empty() {
         return asset_validation(
-            kind_label,
-            source_path_text,
-            target_dir,
-            target_path,
-            file_name,
+            &context,
             "błąd",
             "Nie udało się odczytać nazwy pliku.",
             false,
-            target_dir_exists,
         );
     }
 
     if !has_extension(&source_path, allowed_extensions) {
         return asset_validation(
-            kind_label,
-            source_path_text,
-            target_dir,
-            target_path,
-            file_name,
+            &context,
             "błąd",
             extension_error_message(kind),
             false,
-            target_dir_exists,
         );
     }
 
-    if target_path.exists() {
+    if context.target_path.exists() {
         return asset_validation(
-            kind_label,
-            source_path_text,
-            target_dir,
-            target_path,
-            file_name,
+            &context,
             "błąd",
             "Taki plik już istnieje w folderze docelowym. Launcher nie nadpisuje plików.",
             false,
-            target_dir_exists,
         );
     }
 
     asset_validation(
-        kind_label,
-        source_path_text,
-        target_dir,
-        target_path,
-        file_name,
+        &context,
         "gotowe",
-        if target_dir_exists {
+        if context.target_dir_exists {
             "Plik wygląda poprawnie. Można go skopiować po potwierdzeniu."
         } else {
             "Plik wygląda poprawnie. Folder docelowy zostanie utworzony po potwierdzeniu."
         },
         true,
-        target_dir_exists,
     )
 }
 
@@ -1381,27 +1569,22 @@ fn asset_target(
 }
 
 fn asset_validation(
-    kind: String,
-    source_path: String,
-    target_dir: PathBuf,
-    target_path: PathBuf,
-    file_name: String,
+    context: &AssetValidationContext,
     status: &str,
     message: &str,
     can_install: bool,
-    target_dir_exists: bool,
 ) -> AssetInstallValidation {
     AssetInstallValidation {
-        kind,
-        source_path,
-        target_dir: path_text(&target_dir),
-        target_path: path_text(&target_path),
-        file_name,
+        kind: context.kind.clone(),
+        source_path: context.source_path.clone(),
+        target_dir: path_text(&context.target_dir),
+        target_path: path_text(&context.target_path),
+        file_name: context.file_name.clone(),
         status: status.to_string(),
         message: message.to_string(),
         can_install,
-        target_dir_exists,
-        will_create_target_dir: can_install && !target_dir_exists,
+        target_dir_exists: context.target_dir_exists,
+        will_create_target_dir: can_install && !context.target_dir_exists,
     }
 }
 
@@ -1418,140 +1601,121 @@ fn validate_workflow_file_install_paths(
         .to_string();
     let kind_label = workflow_file_kind_label(kind);
     let will_replace_existing = target_path.is_file();
+    let context = WorkflowFileValidationContext {
+        kind: kind_label,
+        source_path: source_path_text,
+        target_path,
+        file_name,
+        will_replace_existing,
+    };
 
     if !source_path.is_file() {
         return workflow_file_validation(
-            kind_label,
-            source_path_text,
-            target_path,
-            file_name,
+            &context,
             "błąd",
             "Wybrana ścieżka nie jest plikiem.",
             false,
-            will_replace_existing,
         );
     }
 
     if !has_extension(&source_path, &["json"]) {
         return workflow_file_validation(
-            kind_label,
-            source_path_text,
-            target_path,
-            file_name,
+            &context,
             "błąd",
             "Workflow musi być plikiem .json.",
             false,
-            will_replace_existing,
         );
     }
 
     let Ok(json) = read_json_file(&source_path) else {
         return workflow_file_validation(
-            kind_label,
-            source_path_text,
-            target_path,
-            file_name,
+            &context,
             "błąd",
             "Nie udało się odczytać tego pliku jako JSON.",
             false,
-            will_replace_existing,
         );
     };
 
-    if kind == WorkflowFileKind::WorkflowApi
-        && !json
+    if kind == WorkflowFileKind::WorkflowApi {
+        if !json
             .as_object()
             .map(|nodes| !nodes.is_empty())
             .unwrap_or(false)
-    {
-        return workflow_file_validation(
-            kind_label,
-            source_path_text,
-            target_path,
-            file_name,
-            "błąd",
-            "Workflow API wygląda na pusty.",
-            false,
-            will_replace_existing,
-        );
+        {
+            return workflow_file_validation(
+                &context,
+                "błąd",
+                "Workflow API wygląda na pusty.",
+                false,
+            );
+        }
+
+        if !workflow_has_required_classes(&json) {
+            return workflow_file_validation(
+                &context,
+                "błąd",
+                "Workflow API nie ma wszystkich wymaganych node'ów dla FLUX/GGUF, maski, LoRA i zapisu wyniku.",
+                false,
+            );
+        }
     }
 
     if kind == WorkflowFileKind::WorkflowMapping {
         if json.get("inputs").and_then(Value::as_object).is_none() {
             return workflow_file_validation(
-                kind_label,
-                source_path_text,
-                target_path,
-                file_name,
+                &context,
                 "błąd",
                 "Mapping musi mieć sekcję inputs.",
                 false,
-                will_replace_existing,
             );
         }
 
         if !mapping_has_required_inputs(&json) {
             return workflow_file_validation(
-                kind_label,
-                source_path_text,
-                target_path,
-                file_name,
+                &context,
                 "błąd",
                 "Mapping musi wskazywać sourceImage, selectionMask i prompt.",
                 false,
-                will_replace_existing,
             );
         }
 
         if !mapping_lora_slots_are_valid(&json) {
             return workflow_file_validation(
-                kind_label,
-                source_path_text,
-                target_path,
-                file_name,
+                &context,
                 "błąd",
-                "Sekcja inputs.loras musi wskazywać poprawne pola name, strengthModel albo strengthClip.",
+                "Mapping musi mieć poprawną sekcję loraChain albo inputs.loras dla obsługi LoRA.",
                 false,
-                will_replace_existing,
             );
         }
     }
 
     workflow_file_validation(
-        kind_label,
-        source_path_text,
-        target_path,
-        file_name,
+        &context,
         "gotowe",
-        if will_replace_existing {
+        if context.will_replace_existing {
             "Plik wygląda poprawnie. Zastąpi obecny plik workflow po potwierdzeniu."
         } else {
             "Plik wygląda poprawnie. Zostanie dodany do folderu workflow po potwierdzeniu."
         },
         true,
-        will_replace_existing,
     )
 }
 
 fn workflow_file_validation(
-    kind: String,
-    source_path: String,
-    target_path: PathBuf,
-    file_name: String,
+    context: &WorkflowFileValidationContext,
     status: &str,
     message: &str,
     can_install: bool,
-    will_replace_existing: bool,
 ) -> WorkflowFileValidation {
     WorkflowFileValidation {
-        kind,
-        source_path,
-        target_path: path_text(&target_path),
-        file_name,
+        kind: context.kind.clone(),
+        source_path: context.source_path.clone(),
+        target_path: path_text(&context.target_path),
+        file_name: context.file_name.clone(),
         status: status.to_string(),
         message: message.to_string(),
         can_install,
-        will_replace_existing,
+        will_replace_existing: context.will_replace_existing,
     }
 }
 
@@ -1575,7 +1739,25 @@ fn workflow_file_kind_label(kind: WorkflowFileKind) -> String {
 }
 
 fn mapping_has_required_inputs(mapping: &Value) -> bool {
-    ["sourceImage", "selectionMask", "prompt"]
+    [
+        "sourceImage",
+        "selectionMask",
+        "prompt",
+        "negativePrompt",
+        "steps",
+        "cfg",
+        "seed",
+        "seedRandomize",
+        "lorasJson",
+        "width",
+        "height",
+        "cropLeft",
+        "cropTop",
+        "cropWidth",
+        "cropHeight",
+        "docWidth",
+        "docHeight",
+    ]
         .iter()
         .all(|id| mapping_input_is_ready(mapping, id))
 }
@@ -1584,13 +1766,29 @@ fn mapping_input_is_ready(mapping: &Value, id: &str) -> bool {
     mapping
         .get("inputs")
         .and_then(|inputs| inputs.get(id))
-        .map(|input| input.get("nodeId").is_some() && input.get("inputName").is_some())
+        .map(mapping_value_is_ready)
         .unwrap_or(false)
 }
 
+fn mapping_value_is_ready(input: &Value) -> bool {
+    if let Some(items) = input.as_array() {
+        return !items.is_empty() && items.iter().all(mapping_value_is_ready);
+    }
+
+    input.get("nodeId").is_some() && input.get("inputName").is_some()
+}
+
 fn mapping_lora_slots_are_valid(mapping: &Value) -> bool {
-    let Some(loras) = mapping.get("inputs").and_then(|inputs| inputs.get("loras")) else {
+    if mapping_input_is_ready(mapping, "lorasJson") {
         return true;
+    }
+
+    if mapping_lora_chain_is_ready(mapping) {
+        return true;
+    }
+
+    let Some(loras) = mapping.get("inputs").and_then(|inputs| inputs.get("loras")) else {
+        return false;
     };
 
     let Some(slots) = loras.as_array() else {
@@ -1604,10 +1802,70 @@ fn mapping_lora_slots_are_valid(mapping: &Value) -> bool {
     })
 }
 
+fn mapping_lora_chain_is_ready(mapping: &Value) -> bool {
+    let Some(chain) = mapping.get("loraChain") else {
+        return false;
+    };
+
+    let model_source_ready = chain
+        .get("modelSource")
+        .map(|source| source.get("nodeId").is_some())
+        .unwrap_or(false);
+    let clip_source_ready = chain
+        .get("clipSource")
+        .map(|source| source.get("nodeId").is_some())
+        .unwrap_or(false);
+    let model_targets_ready = chain
+        .get("modelTargets")
+        .and_then(Value::as_array)
+        .map(|targets| !targets.is_empty() && targets.iter().all(mapping_value_is_ready))
+        .unwrap_or(false);
+    let clip_targets_ready = chain
+        .get("clipTargets")
+        .and_then(Value::as_array)
+        .map(|targets| !targets.is_empty() && targets.iter().all(mapping_value_is_ready))
+        .unwrap_or(false);
+
+    model_source_ready && clip_source_ready && model_targets_ready && clip_targets_ready
+}
+
 fn mapping_slot_field_is_ready(slot: &Value, field: &str) -> bool {
     slot.get(field)
         .map(|input| input.get("nodeId").is_some() && input.get("inputName").is_some())
         .unwrap_or(false)
+}
+
+fn workflow_has_required_classes(workflow: &Value) -> bool {
+    let Some(nodes) = workflow.as_object() else {
+        return false;
+    };
+
+    let classes: HashSet<&str> = nodes
+        .values()
+        .filter_map(|node| node.get("class_type").and_then(Value::as_str))
+        .collect();
+    let required = [
+        "LoadImage",
+        "LoadImageMask",
+        "UnetLoaderGGUF",
+        "ModelSamplingFlux",
+        "CLIPLoader",
+        "CLIPTextEncode",
+        "VAELoader",
+        "VAEEncode",
+        "ReferenceLatent",
+        "RandomNoise",
+        "KSamplerSelect",
+        "Flux2Scheduler",
+        "CFGGuider",
+        "SamplerCustomAdvanced",
+        "VAEDecode",
+        "RasterRelayLoraStack",
+        "RasterRelayPadToDocument",
+        "RasterRelaySaveImage",
+    ];
+
+    required.iter().all(|class_type| classes.contains(class_type))
 }
 
 fn extension_error_message(kind: AssetKind) -> &'static str {
@@ -1737,11 +1995,12 @@ fn workflow_readiness() -> WorkflowReadiness {
     let required_inputs = required_workflow_inputs(Some(&mapping));
     let required_nodes = required_workflow_nodes(object_info.as_ref());
     let all_inputs_ready = required_inputs.iter().all(|input| input.status == "gotowe");
+    let lora_ready = mapping_lora_slots_are_valid(&mapping);
     let workflow_has_nodes = workflow
         .as_object()
         .map(|nodes| !nodes.is_empty())
         .unwrap_or(false);
-    let ready = mapping_ready && all_inputs_ready && workflow_has_nodes;
+    let ready = mapping_ready && all_inputs_ready && lora_ready && workflow_has_nodes;
 
     WorkflowReadiness {
         status: if ready { "gotowe" } else { "wymaga instalacji" }.to_string(),
@@ -1751,8 +2010,10 @@ fn workflow_readiness() -> WorkflowReadiness {
             "Workflow istnieje, ale mapping nie ma statusu ready.".to_string()
         } else if !workflow_has_nodes {
             "Workflow API jest pusty albo ma niepoprawny format.".to_string()
+        } else if !lora_ready {
+            "Workflow istnieje, ale mapping nie ma poprawnej obsługi LoRA.".to_string()
         } else {
-            "Workflow istnieje, ale brakuje wymaganych wejsc obrazu, maski albo promptu."
+            "Workflow istnieje, ale brakuje wymaganych wejsc obrazu, maski, promptu, rozmiaru albo jakosci."
                 .to_string()
         },
         workflow_path: path_text(&workflow_path),
@@ -1788,7 +2049,25 @@ fn workflow_error(
 }
 
 fn required_workflow_inputs(mapping: Option<&Value>) -> Vec<WorkflowInputStatus> {
-    ["sourceImage", "selectionMask", "prompt"]
+    [
+        "sourceImage",
+        "selectionMask",
+        "prompt",
+        "negativePrompt",
+        "steps",
+        "cfg",
+        "seed",
+        "seedRandomize",
+        "lorasJson",
+        "width",
+        "height",
+        "cropLeft",
+        "cropTop",
+        "cropWidth",
+        "cropHeight",
+        "docWidth",
+        "docHeight",
+    ]
         .into_iter()
         .map(|id| {
             let ready = mapping
@@ -1809,6 +2088,20 @@ fn workflow_input_description(id: &str) -> &'static str {
         "sourceImage" => "Wejscie obrazu z Photoshopa.",
         "selectionMask" => "Wejscie maski zaznaczenia.",
         "prompt" => "Wejscie promptu uzytkownika.",
+        "negativePrompt" => "Negatywny prompt ograniczajacy artefakty.",
+        "steps" => "Liczba krokow generowania z ustawien jakosci.",
+        "cfg" => "Sila prowadzenia modelu dla workflow FLUX.",
+        "seed" => "Seed wariantu generowania.",
+        "seedRandomize" => "Wylaczenie losowania seeda, zeby warianty byly kontrolowane.",
+        "lorasJson" => "Lista LoRA przekazana do RasterRelayLoraStack.",
+        "width" => "Szerokosc wycinka wysylanego do ComfyUI.",
+        "height" => "Wysokosc wycinka wysylanego do ComfyUI.",
+        "cropLeft" => "Pozycja X wycinka w dokumencie Photoshopa.",
+        "cropTop" => "Pozycja Y wycinka w dokumencie Photoshopa.",
+        "cropWidth" => "Dokladna szerokosc wycinka po dopasowaniu do siatki modelu.",
+        "cropHeight" => "Dokladna wysokosc wycinka po dopasowaniu do siatki modelu.",
+        "docWidth" => "Pelna szerokosc dokumentu Photoshopa.",
+        "docHeight" => "Pelna wysokosc dokumentu Photoshopa.",
         _ => "Wejscie workflow.",
     }
 }
@@ -1820,13 +2113,26 @@ fn required_workflow_nodes(object_info: Option<&Value>) -> Vec<WorkflowNodeStatu
             "Wczytanie obrazu i maski przeslanych z Photoshopa.",
         ),
         (
-            "SaveImage",
-            "Zapis wyniku, ktory panel pobierze przez /view.",
+            "RasterRelaySaveImage",
+            "Zapis wyniku jako PNG z kanalem alfa przez /view.",
         ),
-        ("KSampler", "Glowny sampler generowania obrazu."),
+        ("UnetLoaderGGUF", "Wczytanie bazowego modelu GGUF."),
+        ("ModelSamplingFlux", "Ustawienie rozmiaru i parametrów FLUX."),
+        ("Flux2Scheduler", "Scheduler dla FLUX.2."),
+        ("SamplerCustomAdvanced", "Glowny sampler generowania obrazu."),
+        ("ReferenceLatent", "Zachowanie kontekstu obrazu zrodlowego."),
         ("CLIPTextEncode", "Kodowanie promptu uzytkownika."),
+        ("CLIPLoader", "Wczytanie text encodera dla FLUX.2."),
+        ("VAELoader", "Wczytanie VAE."),
         ("VAEDecode", "Zamiana latentow na obraz wynikowy."),
-        ("LoraLoader", "Opcjonalne podlaczenie LoRA."),
+        (
+            "RasterRelayLoraStack",
+            "Podlaczenie 0, 1 albo wielu LoRA przez JSON z panelu.",
+        ),
+        (
+            "RasterRelayPadToDocument",
+            "Wstawienie wyniku z wycinka na pelny rozmiar dokumentu z przezroczystoscia.",
+        ),
     ];
 
     required
@@ -1880,6 +2186,88 @@ fn http_get_json(path: &str, timeout: Duration) -> Result<Value, String> {
 fn read_json_file(path: &Path) -> Result<Value, String> {
     let text = fs::read_to_string(path).map_err(|error| error.to_string())?;
     serde_json::from_str(&text).map_err(|error| error.to_string())
+}
+
+fn read_quality_settings() -> Option<QualitySettings> {
+    let text = fs::read_to_string(quality_settings_path()).ok()?;
+    serde_json::from_str(&text).ok()
+}
+
+fn quality_settings_path() -> PathBuf {
+    repo_root_path()
+        .join("photoshop_plugin")
+        .join("rasterrelay-quality-settings.json")
+}
+
+fn default_quality_settings() -> QualitySettings {
+    QualitySettings {
+        schema_version: "rasterrelay.qualitySettings.v1".to_string(),
+        task_mode: "replaceObject".to_string(),
+        quality: "balanced".to_string(),
+        mask_feather_px: 24,
+        mask_grow_px: 0,
+        variant_count: 1,
+        negative_prompt:
+            "hard square edges, visible seams, distorted hands, extra fingers, unreadable artifacts, duplicated object, damaged background"
+                .to_string(),
+    }
+}
+
+fn normalize_quality_settings(settings: QualitySettings) -> QualitySettings {
+    let mut normalized = default_quality_settings();
+    normalized.task_mode = match settings.task_mode.as_str() {
+        "replaceObject" | "removeTextLogo" | "detailRepair" | "backgroundClean" => {
+            settings.task_mode
+        }
+        _ => normalized.task_mode,
+    };
+    normalized.quality = match settings.quality.as_str() {
+        "fast" | "balanced" | "quality" => settings.quality,
+        _ => normalized.quality,
+    };
+    normalized.mask_feather_px = settings.mask_feather_px.clamp(0, 96);
+    normalized.mask_grow_px = settings.mask_grow_px.clamp(-64, 96);
+    normalized.variant_count = settings.variant_count.clamp(1, 2);
+    normalized.negative_prompt = if settings.negative_prompt.trim().is_empty() {
+        normalized.negative_prompt
+    } else {
+        settings.negative_prompt.trim().to_string()
+    };
+    normalized
+}
+
+fn lora_config_path() -> PathBuf {
+    repo_root_path()
+        .join("photoshop_plugin")
+        .join("rasterrelay-lora-config.json")
+}
+
+fn read_lora_config() -> Option<LoraConfig> {
+    let text = fs::read_to_string(lora_config_path()).ok()?;
+    serde_json::from_str(&text).ok()
+}
+
+fn default_lora_config() -> LoraConfig {
+    LoraConfig {
+        schema_version: "rasterrelay.loraConfig.v1".to_string(),
+        loras: vec![],
+    }
+}
+
+fn normalize_lora_config(config: LoraConfig) -> LoraConfig {
+    let loras = config
+        .loras
+        .into_iter()
+        .map(|entry| LoraEntry {
+            strength_model: entry.strength_model.clamp(0.0, 2.0),
+            strength_clip: entry.strength_clip.clamp(0.0, 2.0),
+            ..entry
+        })
+        .collect();
+    LoraConfig {
+        schema_version: "rasterrelay.loraConfig.v1".to_string(),
+        loras,
+    }
 }
 
 fn repo_root_path() -> PathBuf {
@@ -2259,6 +2647,68 @@ fn folder_item(
     }
 }
 
+fn file_item(
+    id: &str,
+    label: &str,
+    path: &Path,
+    present_description: &str,
+    missing_description: &str,
+    important: bool,
+) -> ReadinessItem {
+    if path.is_file() {
+        item(
+            id,
+            label,
+            Some(path),
+            "wykryto",
+            present_description,
+            None,
+            important,
+        )
+    } else {
+        item(
+            id,
+            label,
+            Some(path),
+            "brak",
+            missing_description,
+            Some("Add"),
+            important,
+        )
+    }
+}
+
+fn file_any_item(
+    id: &str,
+    label: &str,
+    paths: &[PathBuf],
+    present_description: &str,
+    missing_description: &str,
+    important: bool,
+) -> ReadinessItem {
+    if let Some(existing_path) = paths.iter().find(|path| path.is_file()) {
+        item(
+            id,
+            label,
+            Some(existing_path),
+            "wykryto",
+            present_description,
+            None,
+            important,
+        )
+    } else {
+        item(
+            id,
+            label,
+            paths.first().map(PathBuf::as_path),
+            "brak",
+            missing_description,
+            Some("Add"),
+            important,
+        )
+    }
+}
+
 fn item(
     id: &str,
     label: &str,
@@ -2522,8 +2972,7 @@ mod tests {
         let source_dir = temp_dir("workflow-api-source");
         fs::create_dir_all(&source_dir).expect("create source dir");
         let source = source_dir.join("inpainting-api.json");
-        fs::write(&source, r#"{"10":{"class_type":"LoadImage","inputs":{}}}"#)
-            .expect("write workflow");
+        fs::write(&source, valid_workflow_api_json()).expect("write workflow");
 
         let validation =
             validate_workflow_file_install_paths(source.clone(), WorkflowFileKind::WorkflowApi);
@@ -2550,6 +2999,23 @@ mod tests {
 
         assert!(!validation.can_install);
         assert!(validation.message.contains("pusty"));
+
+        fs::remove_dir_all(source_dir).ok();
+    }
+
+    #[test]
+    fn rejects_workflow_api_without_required_flux_nodes() {
+        let source_dir = temp_dir("workflow-api-missing-nodes");
+        fs::create_dir_all(&source_dir).expect("create source dir");
+        let source = source_dir.join("partial.json");
+        fs::write(&source, r#"{"10":{"class_type":"LoadImage","inputs":{}}}"#)
+            .expect("write partial workflow");
+
+        let validation =
+            validate_workflow_file_install_paths(source.clone(), WorkflowFileKind::WorkflowApi);
+
+        assert!(!validation.can_install);
+        assert!(validation.message.contains("FLUX"));
 
         fs::remove_dir_all(source_dir).ok();
     }
@@ -2594,8 +3060,8 @@ mod tests {
     }
 
     #[test]
-    fn rejects_workflow_mapping_with_broken_lora_slots() {
-        let source_dir = temp_dir("workflow-mapping-broken-loras");
+    fn rejects_workflow_mapping_with_broken_loras_json() {
+        let source_dir = temp_dir("workflow-mapping-broken-loras-json");
         fs::create_dir_all(&source_dir).expect("create source dir");
         let source = source_dir.join("mapping.json");
         fs::write(
@@ -2606,7 +3072,26 @@ mod tests {
                 "sourceImage": { "nodeId": "10", "inputName": "image" },
                 "selectionMask": { "nodeId": "11", "inputName": "image" },
                 "prompt": { "nodeId": "20", "inputName": "text" },
-                "loras": [{ "name": { "nodeId": "30" } }]
+                "negativePrompt": { "nodeId": "21", "inputName": "text" },
+                "steps": { "nodeId": "62", "inputName": "steps" },
+                "cfg": { "nodeId": "63", "inputName": "cfg" },
+                "seed": { "nodeId": "60", "inputName": "noise_seed" },
+                "seedRandomize": { "nodeId": "60", "inputName": "randomize_seed" },
+                "lorasJson": { "nodeId": "90" },
+                "width": [
+                  { "nodeId": "21", "inputName": "width" },
+                  { "nodeId": "62", "inputName": "width" }
+                ],
+                "height": [
+                  { "nodeId": "21", "inputName": "height" },
+                  { "nodeId": "62", "inputName": "height" }
+                ],
+                "cropLeft": { "nodeId": "91", "inputName": "crop_left" },
+                "cropTop": { "nodeId": "91", "inputName": "crop_top" },
+                "cropWidth": { "nodeId": "91", "inputName": "crop_width" },
+                "cropHeight": { "nodeId": "91", "inputName": "crop_height" },
+                "docWidth": { "nodeId": "91", "inputName": "doc_width" },
+                "docHeight": { "nodeId": "91", "inputName": "doc_height" }
               }
             }"#,
         )
@@ -2616,7 +3101,7 @@ mod tests {
             validate_workflow_file_install_paths(source.clone(), WorkflowFileKind::WorkflowMapping);
 
         assert!(!validation.can_install);
-        assert!(validation.message.contains("inputs.loras"));
+        assert!(validation.message.contains("Mapping"));
 
         fs::remove_dir_all(source_dir).ok();
     }
@@ -2710,14 +3195,52 @@ mod tests {
             "sourceImage": { "nodeId": "10", "inputName": "image" },
             "selectionMask": { "nodeId": "11", "inputName": "image" },
             "prompt": { "nodeId": "20", "inputName": "text" },
-            "loras": [
-              {
-                "name": { "nodeId": "30", "inputName": "lora_name" },
-                "strengthModel": { "nodeId": "30", "inputName": "strength_model" },
-                "strengthClip": { "nodeId": "30", "inputName": "strength_clip" }
-              }
-            ]
+            "negativePrompt": { "nodeId": "21", "inputName": "text" },
+            "steps": { "nodeId": "62", "inputName": "steps" },
+            "cfg": { "nodeId": "63", "inputName": "cfg" },
+            "seed": { "nodeId": "60", "inputName": "noise_seed" },
+            "seedRandomize": { "nodeId": "60", "inputName": "randomize_seed" },
+            "lorasJson": { "nodeId": "90", "inputName": "loras_json" },
+            "width": [
+              { "nodeId": "21", "inputName": "width" },
+              { "nodeId": "62", "inputName": "width" }
+            ],
+            "height": [
+              { "nodeId": "21", "inputName": "height" },
+              { "nodeId": "62", "inputName": "height" }
+            ],
+            "cropLeft": { "nodeId": "91", "inputName": "crop_left" },
+            "cropTop": { "nodeId": "91", "inputName": "crop_top" },
+            "cropWidth": { "nodeId": "91", "inputName": "crop_width" },
+            "cropHeight": { "nodeId": "91", "inputName": "crop_height" },
+            "docWidth": { "nodeId": "91", "inputName": "doc_width" },
+            "docHeight": { "nodeId": "91", "inputName": "doc_height" }
           }
+        }"#
+    }
+
+    fn valid_workflow_api_json() -> &'static str {
+        r#"{
+          "10": { "class_type": "LoadImage", "inputs": {} },
+          "11": { "class_type": "LoadImageMask", "inputs": {} },
+          "20": { "class_type": "UnetLoaderGGUF", "inputs": {} },
+          "21": { "class_type": "ModelSamplingFlux", "inputs": {} },
+          "30": { "class_type": "CLIPLoader", "inputs": {} },
+          "31": { "class_type": "CLIPTextEncode", "inputs": {} },
+          "32": { "class_type": "CLIPTextEncode", "inputs": {} },
+          "40": { "class_type": "VAELoader", "inputs": {} },
+          "41": { "class_type": "VAEEncode", "inputs": {} },
+          "51": { "class_type": "ReferenceLatent", "inputs": {} },
+          "52": { "class_type": "ReferenceLatent", "inputs": {} },
+          "60": { "class_type": "RandomNoise", "inputs": {} },
+          "61": { "class_type": "KSamplerSelect", "inputs": {} },
+          "62": { "class_type": "Flux2Scheduler", "inputs": {} },
+          "63": { "class_type": "CFGGuider", "inputs": {} },
+          "64": { "class_type": "SamplerCustomAdvanced", "inputs": {} },
+          "65": { "class_type": "VAEDecode", "inputs": {} },
+          "80": { "class_type": "RasterRelaySaveImage", "inputs": {} },
+          "90": { "class_type": "RasterRelayLoraStack", "inputs": {} },
+          "91": { "class_type": "RasterRelayPadToDocument", "inputs": {} }
         }"#
     }
 
@@ -2889,6 +3412,11 @@ mod tests {
 
     #[test]
     fn mapping_lora_slots_valid_detects_bad_slots() {
+        let loras_json: Value = serde_json::from_str(
+            r#"{"inputs":{"lorasJson":{"nodeId":"90","inputName":"loras_json"}}}"#
+        ).expect("parse json");
+        assert!(mapping_lora_slots_are_valid(&loras_json));
+
         let valid: Value = serde_json::from_str(
             r#"{"inputs":{"loras":[{"name":{"nodeId":"10","inputName":"lora_name"},"strengthModel":{"nodeId":"10","inputName":"strength_model"}}]}}"#
         ).expect("parse json");
@@ -2902,7 +3430,7 @@ mod tests {
         let empty: Value = serde_json::from_str(
             r#"{"inputs":{}}"#
         ).expect("parse json");
-        assert!(mapping_lora_slots_are_valid(&empty));
+        assert!(!mapping_lora_slots_are_valid(&empty));
     }
 
     #[test]
@@ -2978,7 +3506,7 @@ mod tests {
         fs::create_dir_all(&source_dir).expect("create dir");
 
         let source = source_dir.join("test-wf.json");
-        fs::write(&source, r#"{"10":{"class_type":"Test","inputs":{}}}"#).expect("write");
+        fs::write(&source, valid_workflow_api_json()).expect("write");
 
         let validation = validate_workflow_file_install_paths(
             source.clone(),
@@ -2995,7 +3523,7 @@ mod tests {
     #[test]
     fn required_workflow_inputs_without_mapping_returns_all_missing() {
         let inputs = required_workflow_inputs(None);
-        assert_eq!(inputs.len(), 3);
+        assert_eq!(inputs.len(), 17);
         assert!(inputs.iter().all(|i| i.status == "brak"));
     }
 
@@ -3035,8 +3563,8 @@ mod tests {
     #[test]
     fn comfy_object_info_returns_none_when_not_running() {
         let result = comfy_object_info();
-        if result.is_some() {
-            assert!(result.unwrap().is_object(), "should be object if running");
+        if let Some(value) = result {
+            assert!(value.is_object(), "should be object if running");
         }
     }
 }

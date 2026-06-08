@@ -38,6 +38,13 @@
       "label": {
         "default": "RasterRelay Test E2E"
       }
+    },
+    {
+      "type": "command",
+      "id": "runGeometrySmokeTest",
+      "label": {
+        "default": "RasterRelay Geometry Test"
+      }
     }
   ],
   "requiredPermissions": {
