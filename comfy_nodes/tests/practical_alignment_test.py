@@ -227,11 +227,11 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument(
         "--source-image",
-        default=str(repo_root / "Testy" / "Obrazy do testowania" / "envato-labs-ai-da532839-090d-4b70-9e60-1ed61c2e94a5.jpg"),
+        default=str(repo_root / "tests" / "manual" / "test-images" / "envato-labs-ai-da532839-090d-4b70-9e60-1ed61c2e94a5.jpg"),
     )
     parser.add_argument(
         "--output-root",
-        default=str(repo_root / "Testy" / "Wyniki testów"),
+        default=str(repo_root / "tests" / "manual" / "test-results"),
     )
     args = parser.parse_args()
     run_practical_alignment_test(Path(args.source_image), Path(args.output_root))

@@ -1,5 +1,5 @@
 param(
-    [string]$SourceImage = "C:\Users\Mierz\Desktop\RasterRelay\Testy\Obrazy do testowania\envato-labs-ai-da532839-090d-4b70-9e60-1ed61c2e94a5.jpg",
+    [string]$SourceImage = "C:\Users\Mierz\Desktop\RasterRelay\tests\manual\test-images\envato-labs-ai-da532839-090d-4b70-9e60-1ed61c2e94a5.jpg",
     [string]$OutputRoot = ""
 )
 

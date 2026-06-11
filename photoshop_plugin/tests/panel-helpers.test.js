@@ -141,6 +141,17 @@ test("dual mask options keep visibility settings exact", () => {
   });
 });
 
+test("positive mask grow is generation-only and does not expand Photoshop visibility", () => {
+  const options = helpers.getDualMaskOptions({
+    quality: "balanced",
+    maskFeatherPx: 0,
+    maskGrowPx: 15
+  });
+
+  assert.equal(options.visibility.growPx, 0);
+  assert.ok(options.generation.growPx > 15);
+});
+
 test("generation mask receives automatic FLUX support halo", () => {
   const options = helpers.getGenerationMaskOptions({
     quality: "balanced",
@@ -203,14 +214,25 @@ test("analyzeMask reports masks touching crop edges", () => {
   assert.ok(analysis.warnings.some((warning) => warning.includes("kraw")));
 });
 
-test("buildFinalPrompt combines task mode prompt and user prompt", () => {
+test("buildFinalPrompt combines universal edit instruction and user prompt", () => {
   const prompt = helpers.buildFinalPrompt(
-    { taskMode: "removeTextLogo", quality: "balanced", maskFeatherPx: 24, maskGrowPx: 0, variantCount: 1 },
+    { quality: "balanced", maskFeatherPx: 24, maskGrowPx: 0, variantCount: 1 },
     "remove the phone number from the car door"
   );
 
-  assert.ok(prompt.includes("Remove readable text"));
+  assert.ok(prompt.includes("Edit only the selected masked area"));
+  assert.ok(prompt.includes("Match the surrounding perspective"));
   assert.ok(prompt.includes("remove the phone number"));
+});
+
+test("buildFinalPrompt keeps arbitrary user intent", () => {
+  const prompt = helpers.buildFinalPrompt(
+    { quality: "balanced", maskFeatherPx: 0, maskGrowPx: 15, variantCount: 1 },
+    "add a snake coiling around the tree"
+  );
+
+  assert.ok(prompt.includes("Edit only the selected masked area"));
+  assert.ok(prompt.includes("add a snake coiling around the tree"));
 });
 
 test("insertDynamicLoraChain creates one loader per LoRA and rewires targets", () => {
@@ -237,4 +259,61 @@ test("insertDynamicLoraChain creates one loader per LoRA and rewires targets", (
   assert.equal(workflow["33"].class_type, "LoraLoader");
   assert.deepEqual(workflow["30"].inputs.model, ["33", 0]);
   assert.deepEqual(workflow["31"].inputs.clip, ["33", 1]);
+});
+
+test("clampNumber returns fallback for non-numeric values", () => {
+  assert.equal(helpers.clampNumber("abc", 5), 5);
+  assert.equal(helpers.clampNumber(NaN, 10), 10);
+  assert.equal(helpers.clampNumber(undefined, 15), 15);
+});
+
+test("clampNumber clamps to min and max", () => {
+  assert.equal(helpers.clampNumber(10, 5, 0, 8), 8);
+  assert.equal(helpers.clampNumber(-5, 5, 0, 10), 0);
+  assert.equal(helpers.clampNumber(5, 5, 0, 10), 5);
+});
+
+test("normalizeQualitySettings defaults to balanced", () => {
+  const settings = helpers.normalizeQualitySettings({});
+  assert.equal(settings.quality, "balanced");
+  assert.equal(settings.schemaVersion, "rasterrelay.qualitySettings.v1");
+});
+
+test("normalizeQualitySettings clamps feather and grow values", () => {
+  const settings = helpers.normalizeQualitySettings({
+    quality: "fast",
+    maskFeatherPx: 200,
+    maskGrowPx: -100
+  });
+  assert.equal(settings.quality, "fast");
+  assert.equal(settings.maskFeatherPx, 96);
+  assert.equal(settings.maskGrowPx, -64);
+});
+
+test("setWorkflowInput sets value on correct node", () => {
+  const workflow = {
+    "10": { class_type: "Loader", inputs: { model: "old" } }
+  };
+  helpers.setWorkflowInput(workflow, { nodeId: "10", inputName: "model" }, "new");
+  assert.equal(workflow["10"].inputs.model, "new");
+});
+
+test("setWorkflowInput handles array of targets", () => {
+  const workflow = {
+    "10": { class_type: "A", inputs: { x: 0 } },
+    "20": { class_type: "B", inputs: { y: 0 } }
+  };
+  helpers.setWorkflowInput(workflow, [
+    { nodeId: "10", inputName: "x" },
+    { nodeId: "20", inputName: "y" }
+  ], 42);
+  assert.equal(workflow["10"].inputs.x, 42);
+  assert.equal(workflow["20"].inputs.y, 42);
+});
+
+test("insertDynamicLoraChain returns false for empty loraItems", () => {
+  const workflow = {};
+  const chain = { modelSource: { nodeId: "1" }, clipSource: { nodeId: "1" } };
+  assert.equal(helpers.insertDynamicLoraChain(workflow, chain, []), false);
+  assert.equal(helpers.insertDynamicLoraChain(workflow, chain, null), false);
 });

@@ -81,6 +81,38 @@
     "docHeight": {
       "nodeId": "91",
       "inputName": "doc_height"
+    },
+    "colorHarmonizeStrength": {
+      "nodeId": "95",
+      "inputName": "strength"
+    },
+    "colorHarmonizeBlendRadius": {
+      "nodeId": "95",
+      "inputName": "blend_radius"
+    },
+    "colorHarmonizeMargin": {
+      "nodeId": "95",
+      "inputName": "margin"
+    },
+    "colorHarmonizeInteriorWeight": {
+      "nodeId": "95",
+      "inputName": "interior_weight"
+    },
+    "colorHarmonizeEdgeBoost": {
+      "nodeId": "95",
+      "inputName": "edge_boost"
+    },
+    "areaMatchStrength": {
+      "nodeId": "99",
+      "inputName": "strength"
+    },
+    "areaMatchMargin": {
+      "nodeId": "99",
+      "inputName": "margin"
+    },
+    "areaMatchBlurRadius": {
+      "nodeId": "99",
+      "inputName": "blur_radius"
     }
   },
   "notes": {
@@ -88,12 +120,16 @@
     "textEncoder": "qwen_3_8b_fp8mixed.safetensors",
     "vae": "flux2-vae.safetensors",
     "maskChannel": "LoadImageMask red channel. Plugin uploads the generation/denoise support mask; Photoshop layer visibility mask is applied separately.",
-    "architecture": "Hybrid: ReferenceLatent + SetLatentNoiseMask + RasterRelay custom nodes. Dual-mask handoff is used; no automatic color/tonal harmonization is applied.",
+    "architecture": "VAEDecode -> VaeDriftMatch(soft, 20) -> AreaMatch(strength 0.9, margin 40) -> ColorHarmonize(strength 0.9, interior 0.8, edge 1.2) -> PadToDocument.",
     "cfg": "1 recommended for FLUX models",
+    "colorPipeline": "VaeDriftMatch restores original pixels outside the mask with soft blending (radius 20). AreaMatch then corrects the ENTIRE generated area's exposure, contrast and color to match the surrounding original using full Reinhard LAB transfer (including luminance). ColorHarmonize finishes the edges with interior_weight=0.8 for strong seam correction.",
     "customNodes": {
       "90": "RasterRelayLoraStack - JSON-driven LoRA chain",
       "91": "RasterRelayPadToDocument - pads full generated crop to full doc size with crop alpha",
-      "94": "RasterRelayVaeDriftMatch - restores unmasked original pixels without pre-feathering layer content"
+      "12": "RasterRelayMaskCropper - legacy helper, unused because the plugin uploads crop-local generation masks",
+      "94": "RasterRelayVaeDriftMatch - soft mask mode, blend_radius=20, restores unmasked pixels with smooth seam transition",
+      "95": "RasterRelayColorHarmonize - Reinhard LAB transfer on the seam region, margin=30, interior_weight=0.8, edge_boost=1.2",
+      "99": "RasterRelayAreaMatch - matches generated area's exposure/contrast/color to surrounding using full Reinhard LAB transfer (including luminance), strength=0.9, margin=40"
     }
   }
 }

@@ -168,12 +168,10 @@ type RasterRelayEnvironmentStartResult = {
   message: string;
 };
 
-type TaskMode = "replaceObject" | "removeTextLogo" | "detailRepair" | "backgroundClean";
 type QualityLevel = "fast" | "balanced" | "quality";
 
 type QualitySettings = {
   schemaVersion: "rasterrelay.qualitySettings.v1";
-  taskMode: TaskMode;
   quality: QualityLevel;
   maskFeatherPx: number;
   maskGrowPx: number;
@@ -196,7 +194,6 @@ const savedComfyuiPathKey = "rasterrelay.comfyuiPath";
 
 const defaultQualitySettings: QualitySettings = {
   schemaVersion: "rasterrelay.qualitySettings.v1",
-  taskMode: "replaceObject",
   quality: "balanced",
   maskFeatherPx: 24,
   maskGrowPx: 0,
@@ -208,25 +205,6 @@ const defaultQualitySettings: QualitySettings = {
 const defaultLoraConfig: LoraConfig = {
   schemaVersion: "rasterrelay.loraConfig.v1",
   loras: []
-};
-
-const taskModeCopy: Record<TaskMode, { label: string; description: string }> = {
-  replaceObject: {
-    label: "Zamiana obiektu",
-    description: "Najlepsze do zadań typu puszka na kubek. Chroni ręce, światło i tło."
-  },
-  removeTextLogo: {
-    label: "Usuń tekst/logo",
-    description: "Do czyszczenia napisów, numerów i znaków bez tworzenia nowych liter."
-  },
-  detailRepair: {
-    label: "Popraw detal",
-    description: "Do małych poprawek, gdzie reszta obrazu ma zostać prawie nietknięta."
-  },
-  backgroundClean: {
-    label: "Wyczyść tło",
-    description: "Do uzupełniania tła zgodnie z otoczeniem i światłem sceny."
-  }
 };
 
 const statusClass: Record<ReadinessStatus, string> = {
@@ -382,7 +360,7 @@ function App() {
         path: "C:\\Program Files\\Adobe\\Adobe UXP Developer Tools\\Adobe UXP Developer Tools.exe",
         pluginManifestPath: "photoshop_plugin\\manifest.json",
         workspacePath: "plugins_workspace.json",
-        message: "Status Adobe UXP Developer Tools dziaĹ‚a tylko w oknie Tauri."
+        message: "Status Adobe UXP Developer Tools działa tylko w oknie Tauri."
       });
     }
   }
@@ -760,7 +738,7 @@ function App() {
       setUxpRuntimeStatus(result.status);
       setNotice(result.message);
     } catch {
-      setNotice("Nie udaĹ‚o siÄ™ uruchomiÄ‡ Adobe UXP Developer Tools z Launchera.");
+      setNotice("Nie udało się uruchomić Adobe UXP Developer Tools z Launchera.");
     } finally {
       setIsRuntimeBusy(false);
     }
@@ -775,7 +753,7 @@ function App() {
       setUxpRuntimeStatus(result.status);
       setNotice(result.message);
     } catch {
-      setNotice("Nie udaĹ‚o siÄ™ dopisaÄ‡ RasterRelay do Adobe UXP Developer Tools.");
+      setNotice("Nie udało się dopisać RasterRelay do Adobe UXP Developer Tools.");
     } finally {
       setIsRuntimeBusy(false);
     }
@@ -788,9 +766,9 @@ function App() {
     try {
       const result = await invoke<UxpPluginLoadResult>("load_uxp_plugin_in_photoshop");
       setUxpRuntimeStatus(result.status);
-      setNotice(result.message || "RasterRelay zaĹ‚adowany w Photoshopie.");
+      setNotice(result.message || "RasterRelay załadowany w Photoshopie.");
     } catch {
-      setNotice("Nie udaĹ‚o siÄ™ zaĹ‚adowaÄ‡ RasterRelay w Photoshopie.");
+      setNotice("Nie udało się załadować RasterRelay w Photoshopie.");
     } finally {
       setIsRuntimeBusy(false);
     }
@@ -901,26 +879,12 @@ function App() {
           <p className="eyebrow">Centrum ustawień</p>
           <h2>Jakość edycji</h2>
           <p>
-            Panel Photoshopa zostaje mały. Tutaj ustawiasz tryb zadania, miękkość maski i liczbę
-            wariantów, a panel użyje tych ustawień przy generowaniu.
+            Panel Photoshopa zostaje mały. Tutaj ustawiasz jakość, miękkość maski i liczbę
+            wariantów, a panel wykona dowolny prompt wpisany przy generowaniu.
           </p>
         </div>
         <StatusBadge status="gotowe" />
         <div className="quality-controls">
-          <label>
-            <span>Tryb zadania</span>
-            <select
-              value={qualitySettings.taskMode}
-              onChange={(event) => updateQualitySettings({ taskMode: event.target.value as TaskMode })}
-            >
-              {Object.entries(taskModeCopy).map(([value, copy]) => (
-                <option value={value} key={value}>
-                  {copy.label}
-                </option>
-              ))}
-            </select>
-            <small>{taskModeCopy[qualitySettings.taskMode].description}</small>
-          </label>
           <label>
             <span>Jakość</span>
             <select
@@ -989,8 +953,8 @@ function App() {
         </div>
         <div className="settings-summary">
           <div>
-            <span>Tryb</span>
-            <p>{taskModeCopy[qualitySettings.taskMode].label}</p>
+            <span>Prompt</span>
+            <p>Jeden uniwersalny tryb edycji dla dowolnego polecenia.</p>
           </div>
           <div>
             <span>Maska</span>
@@ -1023,7 +987,7 @@ function App() {
       ) : null}
 
       {report?.workflow ? (
-        <section className="workflow-panel" aria-label="GotowoĹ›Ä‡ workflow API">
+        <section className="workflow-panel" aria-label="Gotowość workflow API">
           <div>
             <p className="eyebrow">Workflow API</p>
             <h2>{report.workflow.status === "gotowe" ? "Gotowy" : "Wymaga pracy"}</h2>
@@ -1151,7 +1115,7 @@ function App() {
             <div>
               <p className="eyebrow">Wczytanie wtyczki</p>
               <h3>Adobe UXP Developer Tools</h3>
-              <p>{uxpRuntimeStatus?.message ?? "Sprawdzam narzÄ™dzie do wczytania panelu RasterRelay."}</p>
+              <p>{uxpRuntimeStatus?.message ?? "Sprawdzam narzędzie do wczytania panelu RasterRelay."}</p>
             </div>
             <StatusBadge status={uxpRuntimeStatus?.running ? "gotowe" : uxpRuntimeStatus?.installed ? "wykryto" : "brak"} />
             <div className="runtime-actions">
@@ -1167,17 +1131,17 @@ function App() {
                 disabled={isRuntimeBusy || !uxpRuntimeStatus?.installed}
                 onClick={startUxpDeveloperTools}
               >
-                {uxpRuntimeStatus?.running ? "UXP dziaĹ‚a" : "Start UXP"}
+                {uxpRuntimeStatus?.running ? "UXP działa" : "Start UXP"}
               </button>
               <button
                 className="secondary-button"
                 disabled={isRuntimeBusy || !uxpRuntimeStatus?.running || !photoshopRuntimeStatus?.running}
                 onClick={loadUxpPluginInPhotoshop}
               >
-                ZaĹ‚aduj w Photoshopie
+                Załaduj w Photoshopie
               </button>
               <button className="ghost-button" disabled={isRuntimeBusy} onClick={refreshUxpRuntimeStatus}>
-                SprawdĹş UXP
+                Sprawdź UXP
               </button>
             </div>
             <p className="runtime-note">

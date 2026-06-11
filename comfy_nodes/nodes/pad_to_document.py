@@ -102,6 +102,14 @@ class RasterRelayPadToDocument:
         return mask.squeeze(1).clamp(0.0, 1.0)
 
     def pad(self, image, mask, crop_left, crop_top, crop_width, crop_height, doc_width, doc_height, alpha_mode="crop"):
+        # Walidacja parametrów
+        if crop_left < 0 or crop_top < 0:
+            raise ValueError(f"RasterRelayPadToDocument: crop offsets must be non-negative, got left={crop_left}, top={crop_top}")
+        if crop_width <= 0 or crop_height <= 0:
+            raise ValueError(f"RasterRelayPadToDocument: crop dimensions must be positive, got {crop_width}x{crop_height}")
+        if crop_left + crop_width > doc_width or crop_top + crop_height > doc_height:
+            raise ValueError(f"RasterRelayPadToDocument: crop region exceeds document bounds. Doc: {doc_width}x{doc_height}, crop: {crop_left},{crop_top}+{crop_width}x{crop_height}")
+
         batch_size, _img_h, _img_w, channels = image.shape
         rgb_channels = min(3, channels)
         target_crop_width = max(1, int(crop_width))
@@ -130,5 +138,10 @@ class RasterRelayPadToDocument:
                 padded[:, crop_top:crop_top + paste_h, crop_left:crop_left + paste_w, 3] = 1.0
             else:
                 padded[:, crop_top:crop_top + paste_h, crop_left:crop_left + paste_w, 3] = mask_alpha[:, :paste_h, :paste_w]
+
+        # Zwolnij pamięć GPU po dużych operacjach
+        del image, image_rgb, mask_alpha
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
         return (padded,)

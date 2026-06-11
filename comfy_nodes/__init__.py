@@ -9,6 +9,12 @@ from .nodes.match_and_align import (
     RasterRelayVaeDriftMatch,
     RasterRelayGrainInjector,
 )
+from .nodes.color_harmonize import RasterRelayColorHarmonize
+from .nodes.color_match import RasterRelayColorMatch
+from .nodes.grain_transfer import RasterRelayGrainTransfer
+from .nodes.edge_harmonize import RasterRelayEdgeHarmonize
+from .nodes.area_match import RasterRelayAreaMatch
+from .nodes.mask_cropper import RasterRelayMaskCropper
 
 NODE_CLASS_MAPPINGS = {
     "RasterRelaySelectionMask": RasterRelaySelectionMask,
@@ -19,6 +25,12 @@ NODE_CLASS_MAPPINGS = {
     "RasterRelaySmartCropTrimmer": RasterRelaySmartCropTrimmer,
     "RasterRelayVaeDriftMatch": RasterRelayVaeDriftMatch,
     "RasterRelayGrainInjector": RasterRelayGrainInjector,
+    "RasterRelayGrainTransfer": RasterRelayGrainTransfer,
+    "RasterRelayColorHarmonize": RasterRelayColorHarmonize,
+    "RasterRelayColorMatch": RasterRelayColorMatch,
+    "RasterRelayEdgeHarmonize": RasterRelayEdgeHarmonize,
+    "RasterRelayAreaMatch": RasterRelayAreaMatch,
+    "RasterRelayMaskCropper": RasterRelayMaskCropper,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -30,6 +42,12 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "RasterRelaySmartCropTrimmer": "RasterRelay Smart Crop Trimmer",
     "RasterRelayVaeDriftMatch": "RasterRelay VAE Drift Match",
     "RasterRelayGrainInjector": "RasterRelay Grain Injector",
+    "RasterRelayGrainTransfer": "RasterRelay Grain Transfer",
+    "RasterRelayColorHarmonize": "RasterRelay Color Harmonize",
+    "RasterRelayColorMatch": "RasterRelay Color Match",
+    "RasterRelayEdgeHarmonize": "RasterRelay Edge Harmonize",
+    "RasterRelayAreaMatch": "RasterRelay Area Match",
+    "RasterRelayMaskCropper": "RasterRelay Mask Cropper",
 }
 
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]

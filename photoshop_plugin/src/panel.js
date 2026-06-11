@@ -27,7 +27,6 @@ const defaultQualitySettings = panelHelpers.normalizeQualitySettings
   ? panelHelpers.normalizeQualitySettings({})
   : {
       schemaVersion: "rasterrelay.qualitySettings.v1",
-      taskMode: "replaceObject",
       quality: "balanced",
       maskFeatherPx: 24,
       maskGrowPx: 0,
@@ -69,31 +68,31 @@ const panelMarkup = `
         <span class="status-dot" id="comfyDot"></span>
         <strong id="comfyStatus">ComfyUI: niesprawdzone</strong>
       </div>
-      <button id="checkComfyButton">Sprawdz ComfyUI</button>
+      <button id="checkComfyButton">Sprawdź ComfyUI</button>
     </section>
 
     <section class="form-section" aria-label="Ustawienia inpaintingu">
       <label for="promptInput">Prompt</label>
-      <textarea id="promptInput" rows="5" placeholder="Napisz, co ma sie pojawic w zaznaczonym miejscu."></textarea>
+      <textarea id="promptInput" rows="5" placeholder="Napisz, co ma się pojawić w zaznaczonym miejscu."></textarea>
 
-      <p class="hint">Reszta ustawien bedzie w Launcherze, zeby panel Photoshopa zostal lekki.</p>
+      <p class="hint">Reszta ustawień będzie w Launcherze, żeby panel Photoshopa został lekki.</p>
     </section>
 
     <section class="action-section" aria-label="Funkcja RasterRelay">
       <button class="primary" id="prepareButton">Przygotuj edycje</button>
       <button class="dev-only" id="e2eSmokeButton">Test E2E</button>
-      <button id="documentButton">Sprawdz dokument</button>
+      <button id="documentButton">Sprawdź dokument</button>
     </section>
 
     <section class="log-card" aria-live="polite">
-      <p id="messageText">Otworz dokument w Photoshopie, uruchom ComfyUI w Launcherze i sprawdz polaczenie.</p>
+      <p id="messageText">Otwórz dokument w Photoshopie, uruchom ComfyUI w Launcherze i sprawdź połączenie.</p>
     </section>
 
     <section class="rr-hidden-settings" aria-hidden="true">
       <select id="qualitySelect">
-        <option value="balanced" selected>Dobra jakosc</option>
+        <option value="balanced" selected>Dobra jakość</option>
         <option value="fast">Szybki test</option>
-        <option value="quality">Dokladna edycja</option>
+        <option value="quality">Dokładna edycja</option>
       </select>
       <button id="readinessButton" type="button"></button>
       <button id="packageButton" type="button"></button>
@@ -487,7 +486,6 @@ function buildInpaintingJob(
     assets,
     generation: {
       tool: "inpainting-brush",
-      taskMode: qualitySettings.taskMode,
       prompt,
       finalPrompt,
       negativePrompt: qualitySettings.negativePrompt,
@@ -555,9 +553,10 @@ async function getPluginTextFile(relativePath) {
     entry = await entry.getEntry(part);
   }
 
-  return entry.read({
+  const text = await entry.read({
     format: uxp.storage.formats.utf8
   });
+  return String(text).replace(/^\uFEFF/, "");
 }
 
 async function getOptionalPluginTextFile(relativePath) {
@@ -654,7 +653,7 @@ async function exportCroppedSourcePng(document, dataFolder, filePrefix, paddedBo
   const exportedSize = await readPngDimensions(file);
   if (exportedSize.width !== paddedBounds.width || exportedSize.height !== paddedBounds.height) {
     throw new Error(
-      `Eksport z Photoshopa ma zly rozmiar: ${exportedSize.width} x ${exportedSize.height}, a powinien miec ${paddedBounds.width} x ${paddedBounds.height}.`
+      `Eksport z Photoshopa ma zły rozmiar: ${exportedSize.width} x ${exportedSize.height}, a powinien mieć ${paddedBounds.width} x ${paddedBounds.height}.`
     );
   }
 
@@ -1031,7 +1030,7 @@ function getMaskOptions(settings, width, height, role = "visibility") {
       ? Math.max(0, Math.round(normalized.maskFeatherPx))
       : fallbackFeather,
     growPx: Number.isFinite(Number(normalized.maskGrowPx))
-      ? Math.round(normalized.maskGrowPx)
+      ? Math.min(0, Math.round(normalized.maskGrowPx))
       : 0,
     haloPx: 0
   };
@@ -1115,7 +1114,7 @@ async function captureSoftFullDocumentMaskPixels(photoshop, document, qualitySet
           width: docWidth,
           height: docHeight,
           pixels: processedMask.values,
-          featherRadius: processedMask.options.featherPx,
+        featherRadius: processedMask.options.featherPx,
           growPx: processedMask.options.growPx,
           haloPx: processedMask.options.haloPx,
           options: processedMask.options,
@@ -1825,7 +1824,7 @@ async function alignLayerToExpectedBounds(activeLayer, placementGeometry) {
   actual = readBoundsObject(activeLayer.bounds);
   if (boundsMatch(expected, actual) === false) {
     throw new Error(
-      `Nie udalo sie dopasowac pozycji warstwy wyniku. Po przesunieciu bounds=${JSON.stringify(actual)}, oczekiwano=${JSON.stringify(expected)}.`
+      `Nie udało się dopasować pozycji warstwy wyniku. Po przesunięciu bounds=${JSON.stringify(actual)}, oczekiwano=${JSON.stringify(expected)}.`
     );
   }
 

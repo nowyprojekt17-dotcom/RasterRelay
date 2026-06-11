@@ -276,28 +276,15 @@
     };
   }
 
-  const taskModePrompts = {
-    replaceObject:
-      "Replace only the selected object. Preserve hands, fingers, perspective, lighting, background, shadows and surrounding details.",
-    removeTextLogo:
-      "Remove readable text, logos and numbers only inside the mask. Reconstruct the original material, reflections, panel lines and texture. Do not create new readable letters.",
-    detailRepair:
-      "Repair only the selected detail. Keep the rest of the image unchanged. Preserve texture, lighting, edges and scale.",
-    backgroundClean:
-      "Fill the selected area with matching background. Preserve depth of field, lighting, grain, color and surrounding structure."
-  };
+  const universalEditPrompt =
+    "Edit only the selected masked area according to the user's request. Keep the result photorealistic and naturally integrated with the original image. Match the surrounding perspective, lighting, shadows, color temperature, exposure, contrast, grain, texture sharpness and depth of field. Preserve unmasked areas exactly. Avoid visible seams, halos, pasted-on edges or color shifts between generated pixels and the original image.";
 
   const defaultNegativePrompt =
     "hard square edges, visible seams, distorted hands, extra fingers, unreadable artifacts, duplicated object, damaged background";
 
-  function normalizeTaskMode(mode) {
-    return Object.prototype.hasOwnProperty.call(taskModePrompts, mode) ? mode : "replaceObject";
-  }
-
   function normalizeQualitySettings(settings = {}) {
     return {
       schemaVersion: "rasterrelay.qualitySettings.v1",
-      taskMode: normalizeTaskMode(settings.taskMode),
       quality: ["fast", "balanced", "quality"].includes(settings.quality) ? settings.quality : "balanced",
       maskFeatherPx: clampNumber(settings.maskFeatherPx, 24, 0, 96),
       maskGrowPx: clampNumber(settings.maskGrowPx, 0, -64, 96),
@@ -315,7 +302,7 @@
     return {
       role: "visibility",
       featherPx: Math.round(normalized.maskFeatherPx),
-      growPx: Math.round(normalized.maskGrowPx),
+      growPx: Math.min(0, Math.round(normalized.maskGrowPx)),
       haloPx: 0
     };
   }
@@ -343,10 +330,8 @@
   }
 
   function buildFinalPrompt(settings, userPrompt) {
-    const normalized = normalizeQualitySettings(settings);
-    const basePrompt = taskModePrompts[normalized.taskMode];
     const cleanUserPrompt = String(userPrompt || "").trim();
-    return cleanUserPrompt ? `${basePrompt} User request: ${cleanUserPrompt}` : basePrompt;
+    return cleanUserPrompt ? `${universalEditPrompt} User request: ${cleanUserPrompt}` : universalEditPrompt;
   }
 
   function setWorkflowInput(workflow, mappingItem, value) {
@@ -434,7 +419,7 @@
     parseLoraToken,
     setWorkflowInput,
     softenGrayscaleMask,
-    taskModePrompts
+    universalEditPrompt
   };
 
   root.RasterRelayPanelHelpers = helpers;

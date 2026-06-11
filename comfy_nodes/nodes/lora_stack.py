@@ -1,9 +1,16 @@
 import json
 import logging
 
-import folder_paths
-import comfy.utils
-import comfy.sd
+# ComfyUI modules - optional imports for testing
+try:
+    import folder_paths
+    import comfy.utils
+    import comfy.sd
+    COMFYUI_AVAILABLE = True
+except ImportError:
+    COMFYUI_AVAILABLE = False
+    folder_paths = None
+    comfy = None
 
 
 class RasterRelayLoraStack:
