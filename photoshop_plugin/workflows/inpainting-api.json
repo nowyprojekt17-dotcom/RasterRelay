@@ -217,6 +217,22 @@
       ]
     }
   },
+  "13": {
+    "class_type": "RasterRelayMaskEdgeRefine",
+    "inputs": {
+      "image": [
+        "10",
+        0
+      ],
+      "mask": [
+        "11",
+        0
+      ],
+      "radius": 8,
+      "edge_sensitivity": 0.02,
+      "strength": 1.0
+    }
+  },
   "94": {
     "class_type": "RasterRelayVaeDriftMatch",
     "inputs": {
@@ -229,7 +245,7 @@
         0
       ],
       "mask": [
-        "11",
+        "13",
         0
       ],
       "blend_radius": 16,
@@ -249,22 +265,64 @@
         0
       ],
       "mask": [
-        "11",
+        "13",
         0
       ],
       "tone_radius": 40,
-      "strength": 1.0
+      "strength": 1.0,
+      "mode": "full"
+    }
+  },
+  "97": {
+    "class_type": "RasterRelaySeamlessTone",
+    "inputs": {
+      "original_image": [
+        "10",
+        0
+      ],
+      "generated_image": [
+        "96",
+        0
+      ],
+      "mask": [
+        "13",
+        0
+      ],
+      "tone_radius": 120,
+      "strength": 0.85,
+      "mode": "chroma"
+    }
+  },
+  "98": {
+    "class_type": "RasterRelayGrainTransfer",
+    "inputs": {
+      "original_image": [
+        "10",
+        0
+      ],
+      "generated_image": [
+        "97",
+        0
+      ],
+      "mask": [
+        "13",
+        0
+      ],
+      "grain_strength": 0.8,
+      "blur_radius": 3,
+      "edge_feather": 16,
+      "preserve_luminance": true
     }
   },
   "91": {
     "class_type": "RasterRelayPadToDocument",
     "inputs": {
       "image": [
-        "96",
+        "98",
         0
       ],
       "mask": [
-        "11",
+        "13",
         0
       ],
       "crop_left": 0,

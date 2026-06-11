@@ -21,9 +21,15 @@ wf = {
  "63": {"class_type": "CFGGuider", "inputs": {"model": ["22", 0], "positive": ["51", 0], "negative": ["52", 0], "cfg": 1}},
  "64": {"class_type": "SamplerCustomAdvanced", "inputs": {"noise": ["60", 0], "guider": ["63", 0], "sampler": ["61", 0], "sigmas": ["62", 0], "latent_image": ["42", 0]}},
  "65": {"class_type": "VAEDecode", "inputs": {"samples": ["64", 0], "vae": ["40", 0]}},
- "94": {"class_type": "RasterRelayVaeDriftMatch", "inputs": {"original_crop": ["10", 0], "generated_crop": ["65", 0], "mask": ["11", 0], "blend_radius": 16, "restore_unmasked": True, "mask_mode": "soft"}},
- "96": {"class_type": "RasterRelaySeamlessTone", "inputs": {"original_image": ["10", 0], "generated_image": ["94", 0], "mask": ["11", 0], "tone_radius": 40, "strength": 1.0}},
- "91": {"class_type": "RasterRelayPadToDocument", "inputs": {"image": ["96", 0], "mask": ["11", 0], "crop_left": 0, "crop_top": 0, "crop_width": 1024, "crop_height": 768, "doc_width": 1024, "doc_height": 768, "alpha_mode": "crop"}},
+ # Phase C: edge-aware compositing mask (snaps to hair strands etc.)
+ "13": {"class_type": "RasterRelayMaskEdgeRefine", "inputs": {"image": ["10", 0], "mask": ["11", 0], "radius": 8, "edge_sensitivity": 0.02, "strength": 1.0}},
+ "94": {"class_type": "RasterRelayVaeDriftMatch", "inputs": {"original_crop": ["10", 0], "generated_crop": ["65", 0], "mask": ["13", 0], "blend_radius": 16, "restore_unmasked": True, "mask_mode": "soft"}},
+ "96": {"class_type": "RasterRelaySeamlessTone", "inputs": {"original_image": ["10", 0], "generated_image": ["94", 0], "mask": ["13", 0], "tone_radius": 40, "strength": 1.0, "mode": "full"}},
+ # Phase C: large-radius chroma-only pass kills residual colour cast without touching luminance
+ "97": {"class_type": "RasterRelaySeamlessTone", "inputs": {"original_image": ["10", 0], "generated_image": ["96", 0], "mask": ["13", 0], "tone_radius": 120, "strength": 0.85, "mode": "chroma"}},
+ # Phase C: photographic grain continuity from the original
+ "98": {"class_type": "RasterRelayGrainTransfer", "inputs": {"original_image": ["10", 0], "generated_image": ["97", 0], "mask": ["13", 0], "grain_strength": 0.8, "blur_radius": 3, "edge_feather": 16, "preserve_luminance": True}},
+ "91": {"class_type": "RasterRelayPadToDocument", "inputs": {"image": ["98", 0], "mask": ["13", 0], "crop_left": 0, "crop_top": 0, "crop_width": 1024, "crop_height": 768, "doc_width": 1024, "doc_height": 768, "alpha_mode": "crop"}},
  "80": {"class_type": "RasterRelaySaveImage", "inputs": {"images": ["91", 0], "filename_prefix": "RasterRelay/inpainting"}},
 }
 
@@ -50,13 +56,18 @@ mapping = {
   "docHeight": {"nodeId": "91", "inputName": "doc_height"},
   "toneRadius": {"nodeId": "96", "inputName": "tone_radius"},
   "toneStrength": {"nodeId": "96", "inputName": "strength"},
+  "chromaRadius": {"nodeId": "97", "inputName": "tone_radius"},
+  "chromaStrength": {"nodeId": "97", "inputName": "strength"},
+  "grainStrength": {"nodeId": "98", "inputName": "grain_strength"},
+  "maskRefineStrength": {"nodeId": "13", "inputName": "strength"},
  },
  "notes": {
   "baseModel": "flux-2-klein-9b-Q4_K_M.gguf",
   "textEncoder": "qwen_3_8b_fp8mixed.safetensors",
   "vae": "flux2-vae.safetensors",
   "maskChannel": "LoadImageMask red channel. Plugin uploads the crop-local generation/denoise mask.",
-  "architecture": "DifferentialDiffusion(per-pixel denoise from soft mask) + VAEDecode -> VaeDriftMatch(restore unmasked, soft, 16) -> SeamlessTone(tone_radius~crop/8, strength 1.0) -> PadToDocument -> SaveImage.",
+  "architecture": "DifferentialDiffusion + VAEDecode -> [MaskEdgeRefine guides compositing] -> VaeDriftMatch -> SeamlessTone(full, ~crop/8) -> SeamlessTone(chroma-only, ~crop/3) -> GrainTransfer -> PadToDocument -> SaveImage.",
+  "phaseC": "MaskEdgeRefine (guided filter) snaps the compositing mask to real image edges (hair strands keep their silhouette, no halo). Chroma-only SeamlessTone pass at large radius removes residual colour cast without touching luminance. GrainTransfer restores photographic grain so the patch shares the original's texture character. Generation/denoise path still uses the raw plugin mask (node 11) - refinement applies to compositing only.",
   "differentialDiffusion": "Model patch: soft mask becomes a per-pixel denoise gradient, so the model itself blends tone/texture progressively at the boundary. Measured -18% dL_seam / -22% seam_step on the hair-recolor case; neutral on easy cases. InpaintModelConditioning was tested and is a no-op for Flux2 Klein GGUF (pixel-identical output) - intentionally not used.",
   "colorPipeline": "VaeDriftMatch hard-restores original pixels outside the selection (zero VAE drift there). SeamlessTone then diffuses the surrounding low-frequency colour/brightness INTO the masked region and shifts only the generated low frequency to match it, fixing exposure/colour offset AND lighting gradients while preserving generated detail. Replaces the old global-Reinhard AreaMatch+ColorHarmonize chain, which measurably worsened the seam.",
   "tone_radius": "Gaussian sigma in px of the tone field. Plugin sets it to ~1/8 of the smaller crop dimension (about 1/4 of the selection radius).",

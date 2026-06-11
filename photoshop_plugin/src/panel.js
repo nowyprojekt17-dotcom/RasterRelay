@@ -1536,6 +1536,10 @@ function applyWorkflowInputs(workflow, mapping, job, comfyUploads) {
     const toneRadius = Math.max(16, Math.min(200, Math.round(Math.min(genWidth, genHeight) / 8)));
     setWorkflowInput(workflow, mapping.inputs.toneRadius, toneRadius);
     setWorkflowInput(workflow, mapping.inputs.toneStrength, 1.0);
+
+    // 2nd pass: large-radius chroma-only colour-cast correction (~crop/3)
+    const chromaRadius = Math.max(32, Math.min(320, Math.round(Math.min(genWidth, genHeight) / 3)));
+    setWorkflowInput(workflow, mapping.inputs.chromaRadius, chromaRadius);
   }
 
   applyLoraWorkflowInputs(workflow, mapping, job.generation.lora.items);

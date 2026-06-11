@@ -51,7 +51,13 @@ class RasterRelaySeamlessTone:
                     "default": 1.0, "min": 0.0, "max": 1.0, "step": 0.05,
                     "tooltip": "How strongly to pull the patch toward the surrounding tone (1 = full).",
                 }),
-            }
+            },
+            "optional": {
+                "mode": (["full", "chroma"], {
+                    "default": "full",
+                    "tooltip": "full = correct brightness and colour; chroma = correct only colour cast, keep the patch's luminance (useful as a 2nd large-radius pass).",
+                }),
+            },
         }
 
     @staticmethod
@@ -95,7 +101,7 @@ class RasterRelaySeamlessTone:
             blurred = F.interpolate(blurred, size=(x.shape[2], x.shape[3]), mode="bilinear", align_corners=False)
         return blurred
 
-    def match_tone(self, original_image, generated_image, mask, tone_radius, strength):
+    def match_tone(self, original_image, generated_image, mask, tone_radius, strength, mode="full"):
         if strength <= 0.0:
             return (generated_image.clone(),)
 
@@ -135,6 +141,13 @@ class RasterRelaySeamlessTone:
         gen_lf = self._blur_bchw(gen_bchw, sigma)
 
         correction = (target_lf - gen_lf) * strength
+        if mode == "chroma":
+            # remove the luma component so only the colour cast is corrected
+            # (Rec.709 weights sum to 1, so subtracting the weighted mean
+            # leaves a zero-luma chroma vector)
+            lw = torch.tensor([0.2126, 0.7152, 0.0722], device=device, dtype=dtype).view(1, 3, 1, 1)
+            corr_luma = (correction * lw).sum(dim=1, keepdim=True)
+            correction = correction - corr_luma
         result_bchw = gen_bchw + correction * mask.permute(0, 3, 1, 2)
         result = result_bchw.permute(0, 2, 3, 1).clamp(0.0, 1.0)
 

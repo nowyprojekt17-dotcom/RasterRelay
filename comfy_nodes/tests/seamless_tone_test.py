@@ -53,6 +53,24 @@ def test_outside_mask_unchanged():
     assert torch.allclose(out[:, :8, :8, :], gen[:, :8, :8, :], atol=1e-4)
 
 
+def test_chroma_mode_preserves_luminance():
+    orig, gen, mask, (lo, hi) = _make_case(surround=0.3, patch=0.6)
+    node = RasterRelaySeamlessTone()
+    (out,) = node.match_tone(orig, gen, mask, tone_radius=20, strength=1.0, mode="chroma")
+
+    def luma(img):
+        w = torch.tensor([0.2126, 0.7152, 0.0722])
+        return (img * w.view(1, 1, 1, 3)).sum(-1)
+
+    # luminance inside the patch must stay (almost) unchanged in chroma mode
+    dl = (luma(out)[:, lo:hi, lo:hi] - luma(gen)[:, lo:hi, lo:hi]).abs().mean().item()
+    assert dl < 0.01, f"chroma mode changed luminance by {dl:.4f}"
+    # while the full mode does change it on this case
+    (out_full,) = node.match_tone(orig, gen, mask, tone_radius=20, strength=1.0, mode="full")
+    dl_full = (luma(out_full)[:, lo:hi, lo:hi] - luma(gen)[:, lo:hi, lo:hi]).abs().mean().item()
+    assert dl_full > dl
+
+
 def test_alpha_channel_preserved():
     orig, gen, mask, _ = _make_case()
     gen4 = torch.cat([gen, torch.full((1, gen.shape[1], gen.shape[2], 1), 0.5)], dim=-1)
