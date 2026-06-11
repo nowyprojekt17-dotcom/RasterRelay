@@ -53,6 +53,15 @@
       "loras_json": "[]"
     }
   },
+  "22": {
+    "class_type": "DifferentialDiffusion",
+    "inputs": {
+      "model": [
+        "90",
+        0
+      ]
+    }
+  },
   "31": {
     "class_type": "CLIPTextEncode",
     "inputs": {
@@ -156,7 +165,7 @@
     "class_type": "CFGGuider",
     "inputs": {
       "model": [
-        "90",
+        "22",
         0
       ],
       "positive": [

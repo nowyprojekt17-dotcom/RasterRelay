@@ -96,7 +96,8 @@
     "textEncoder": "qwen_3_8b_fp8mixed.safetensors",
     "vae": "flux2-vae.safetensors",
     "maskChannel": "LoadImageMask red channel. Plugin uploads the crop-local generation/denoise mask.",
-    "architecture": "VAEDecode -> VaeDriftMatch(restore unmasked, soft, 16) -> SeamlessTone(tone_radius~crop/8, strength 1.0) -> PadToDocument -> SaveImage.",
+    "architecture": "DifferentialDiffusion(per-pixel denoise from soft mask) + VAEDecode -> VaeDriftMatch(restore unmasked, soft, 16) -> SeamlessTone(tone_radius~crop/8, strength 1.0) -> PadToDocument -> SaveImage.",
+    "differentialDiffusion": "Model patch: soft mask becomes a per-pixel denoise gradient, so the model itself blends tone/texture progressively at the boundary. Measured -18% dL_seam / -22% seam_step on the hair-recolor case; neutral on easy cases. InpaintModelConditioning was tested and is a no-op for Flux2 Klein GGUF (pixel-identical output) - intentionally not used.",
     "colorPipeline": "VaeDriftMatch hard-restores original pixels outside the selection (zero VAE drift there). SeamlessTone then diffuses the surrounding low-frequency colour/brightness INTO the masked region and shifts only the generated low frequency to match it, fixing exposure/colour offset AND lighting gradients while preserving generated detail. Replaces the old global-Reinhard AreaMatch+ColorHarmonize chain, which measurably worsened the seam.",
     "tone_radius": "Gaussian sigma in px of the tone field. Plugin sets it to ~1/8 of the smaller crop dimension (about 1/4 of the selection radius).",
     "cfg": "1 recommended for FLUX models"
