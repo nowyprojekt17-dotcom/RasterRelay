@@ -1529,6 +1529,13 @@ function applyWorkflowInputs(workflow, mapping, job, comfyUploads) {
   if (genWidth && genHeight) {
     setWorkflowInput(workflow, mapping.inputs.width, Math.round(genWidth));
     setWorkflowInput(workflow, mapping.inputs.height, Math.round(genHeight));
+
+    // SeamlessTone: scale the tone-diffusion radius to the crop so colour/
+    // brightness matching works on small and very large crops alike
+    // (~1/8 of the smaller crop dimension ≈ 1/4 of the selection radius).
+    const toneRadius = Math.max(16, Math.min(200, Math.round(Math.min(genWidth, genHeight) / 8)));
+    setWorkflowInput(workflow, mapping.inputs.toneRadius, toneRadius);
+    setWorkflowInput(workflow, mapping.inputs.toneStrength, 1.0);
   }
 
   applyLoraWorkflowInputs(workflow, mapping, job.generation.lora.items);

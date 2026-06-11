@@ -8,6 +8,22 @@ a ten projekt adheres to [Semantic Versioning](https://semver.org/lang/pl/).
 ## [Unreleased]
 
 ### Added
+- **Węzeł `RasterRelaySeamlessTone`** — bezszwowe dopasowanie jasności/koloru
+  przez dyfuzję tonu otoczenia do wnętrza maski (niska częstotliwość,
+  zachowuje detal, naprawia też gradienty światła). Rozwiązuje główny problem
+  niespójności wygenerowanego fragmentu. Zmierzona poprawa szwu ~26% vs surowa
+  generacja i vs stary łańcuch Reinharda.
+- Przebudowany od zera `photoshop_plugin/workflows/inpainting-api.json`:
+  `VAEDecode → VaeDriftMatch → SeamlessTone → PadToDocument → SaveImage`.
+- `tone_radius` auto-skalowany w `panel.js` wg rozmiaru wycinka (klucze
+  `toneRadius`/`toneStrength` w mappingu).
+- Testy jednostkowe `seamless_tone_test.py` (5 testów).
+
+### Changed
+- Usunięto z aktywnego workflow nieskuteczny łańcuch `AreaMatch + ColorHarmonize`
+  (globalny Reinhard pogarszał szew); węzły zostają w bibliotece.
+
+### Added (wcześniej)
 - Testy jednostkowe dla `grain_transfer.py` (6 testów)
 - Testy jednostkowe dla `edge_harmonize.py` (7 testów)
 - Wspólny moduł `comfy_nodes/utils/mask_processing.py` z funkcjami `blur_mask` i `gaussian_kernel`

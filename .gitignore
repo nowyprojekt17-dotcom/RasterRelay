@@ -28,3 +28,7 @@ tests/manual/test-results/*.tmp
 tests/manual/test-results/*.log
 # Test image fixtures (binary, kept local only)
 tests/manual/test-images/
+
+# Local sqlite scratch DBs (created by MCP/bridge tooling at runtime)
+generations.db
+generations.db-*

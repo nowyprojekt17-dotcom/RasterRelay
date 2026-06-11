@@ -14,6 +14,7 @@ from .edge_harmonize import RasterRelayEdgeHarmonize
 from .area_match import RasterRelayAreaMatch
 from .mask_cropper import RasterRelayMaskCropper
 from .background_preserve import RasterRelayBackgroundPreserve
+from .seamless_tone import RasterRelaySeamlessTone
 
 __all__ = [
     "RasterRelaySelectionMask",
@@ -30,4 +31,5 @@ __all__ = [
     "RasterRelayAreaMatch",
     "RasterRelayMaskCropper",
     "RasterRelayBackgroundPreserve",
+    "RasterRelaySeamlessTone",
 ]

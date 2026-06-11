@@ -1,6 +1,6 @@
 {
   "status": "ready",
-  "description": "RasterRelay Flux.2 Klein 9B GGUF hybrid workflow with RasterRelay custom nodes.",
+  "description": "RasterRelay Flux.2 Klein 9B GGUF inpainting. Seam-free colour via VaeDriftMatch + SeamlessTone (low-frequency tone diffusion).",
   "inputs": {
     "sourceImage": {
       "nodeId": "10",
@@ -14,6 +14,10 @@
       "nodeId": "31",
       "inputName": "text"
     },
+    "negativePrompt": {
+      "nodeId": "32",
+      "inputName": "text"
+    },
     "steps": {
       "nodeId": "62",
       "inputName": "steps"
@@ -21,10 +25,6 @@
     "cfg": {
       "nodeId": "63",
       "inputName": "cfg"
-    },
-    "negativePrompt": {
-      "nodeId": "32",
-      "inputName": "text"
     },
     "seed": {
       "nodeId": "60",
@@ -82,54 +82,23 @@
       "nodeId": "91",
       "inputName": "doc_height"
     },
-    "colorHarmonizeStrength": {
-      "nodeId": "95",
+    "toneRadius": {
+      "nodeId": "96",
+      "inputName": "tone_radius"
+    },
+    "toneStrength": {
+      "nodeId": "96",
       "inputName": "strength"
-    },
-    "colorHarmonizeBlendRadius": {
-      "nodeId": "95",
-      "inputName": "blend_radius"
-    },
-    "colorHarmonizeMargin": {
-      "nodeId": "95",
-      "inputName": "margin"
-    },
-    "colorHarmonizeInteriorWeight": {
-      "nodeId": "95",
-      "inputName": "interior_weight"
-    },
-    "colorHarmonizeEdgeBoost": {
-      "nodeId": "95",
-      "inputName": "edge_boost"
-    },
-    "areaMatchStrength": {
-      "nodeId": "99",
-      "inputName": "strength"
-    },
-    "areaMatchMargin": {
-      "nodeId": "99",
-      "inputName": "margin"
-    },
-    "areaMatchBlurRadius": {
-      "nodeId": "99",
-      "inputName": "blur_radius"
     }
   },
   "notes": {
     "baseModel": "flux-2-klein-9b-Q4_K_M.gguf",
     "textEncoder": "qwen_3_8b_fp8mixed.safetensors",
     "vae": "flux2-vae.safetensors",
-    "maskChannel": "LoadImageMask red channel. Plugin uploads the generation/denoise support mask; Photoshop layer visibility mask is applied separately.",
-    "architecture": "VAEDecode -> VaeDriftMatch(soft, 20) -> AreaMatch(strength 0.9, margin 40) -> ColorHarmonize(strength 0.9, interior 0.8, edge 1.2) -> PadToDocument.",
-    "cfg": "1 recommended for FLUX models",
-    "colorPipeline": "VaeDriftMatch restores original pixels outside the mask with soft blending (radius 20). AreaMatch then corrects the ENTIRE generated area's exposure, contrast and color to match the surrounding original using full Reinhard LAB transfer (including luminance). ColorHarmonize finishes the edges with interior_weight=0.8 for strong seam correction.",
-    "customNodes": {
-      "90": "RasterRelayLoraStack - JSON-driven LoRA chain",
-      "91": "RasterRelayPadToDocument - pads full generated crop to full doc size with crop alpha",
-      "12": "RasterRelayMaskCropper - legacy helper, unused because the plugin uploads crop-local generation masks",
-      "94": "RasterRelayVaeDriftMatch - soft mask mode, blend_radius=20, restores unmasked pixels with smooth seam transition",
-      "95": "RasterRelayColorHarmonize - Reinhard LAB transfer on the seam region, margin=30, interior_weight=0.8, edge_boost=1.2",
-      "99": "RasterRelayAreaMatch - matches generated area's exposure/contrast/color to surrounding using full Reinhard LAB transfer (including luminance), strength=0.9, margin=40"
-    }
+    "maskChannel": "LoadImageMask red channel. Plugin uploads the crop-local generation/denoise mask.",
+    "architecture": "VAEDecode -> VaeDriftMatch(restore unmasked, soft, 16) -> SeamlessTone(tone_radius~crop/8, strength 1.0) -> PadToDocument -> SaveImage.",
+    "colorPipeline": "VaeDriftMatch hard-restores original pixels outside the selection (zero VAE drift there). SeamlessTone then diffuses the surrounding low-frequency colour/brightness INTO the masked region and shifts only the generated low frequency to match it, fixing exposure/colour offset AND lighting gradients while preserving generated detail. Replaces the old global-Reinhard AreaMatch+ColorHarmonize chain, which measurably worsened the seam.",
+    "tone_radius": "Gaussian sigma in px of the tone field. Plugin sets it to ~1/8 of the smaller crop dimension (about 1/4 of the selection radius).",
+    "cfg": "1 recommended for FLUX models"
   }
 }
