@@ -15,6 +15,7 @@ from .nodes.grain_transfer import RasterRelayGrainTransfer
 from .nodes.edge_harmonize import RasterRelayEdgeHarmonize
 from .nodes.area_match import RasterRelayAreaMatch
 from .nodes.mask_cropper import RasterRelayMaskCropper
+from .nodes.background_preserve import RasterRelayBackgroundPreserve
 
 NODE_CLASS_MAPPINGS = {
     "RasterRelaySelectionMask": RasterRelaySelectionMask,
@@ -31,6 +32,7 @@ NODE_CLASS_MAPPINGS = {
     "RasterRelayEdgeHarmonize": RasterRelayEdgeHarmonize,
     "RasterRelayAreaMatch": RasterRelayAreaMatch,
     "RasterRelayMaskCropper": RasterRelayMaskCropper,
+    "RasterRelayBackgroundPreserve": RasterRelayBackgroundPreserve,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -48,6 +50,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "RasterRelayEdgeHarmonize": "RasterRelay Edge Harmonize",
     "RasterRelayAreaMatch": "RasterRelay Area Match",
     "RasterRelayMaskCropper": "RasterRelay Mask Cropper",
+    "RasterRelayBackgroundPreserve": "RasterRelay Background Preserve",
 }
 
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]

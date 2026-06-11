@@ -13,6 +13,7 @@ from .grain_transfer import RasterRelayGrainTransfer
 from .edge_harmonize import RasterRelayEdgeHarmonize
 from .area_match import RasterRelayAreaMatch
 from .mask_cropper import RasterRelayMaskCropper
+from .background_preserve import RasterRelayBackgroundPreserve
 
 __all__ = [
     "RasterRelaySelectionMask",
@@ -28,4 +29,5 @@ __all__ = [
     "RasterRelayEdgeHarmonize",
     "RasterRelayAreaMatch",
     "RasterRelayMaskCropper",
+    "RasterRelayBackgroundPreserve",
 ]
