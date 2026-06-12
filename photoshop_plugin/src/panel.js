@@ -72,6 +72,12 @@ const panelMarkup = `
       <label for="promptInput">Prompt</label>
       <textarea id="promptInput" rows="5" placeholder="Napisz, co ma się pojawić w zaznaczonym miejscu."></textarea>
 
+      <label for="editModeSelect">Tryb</label>
+      <select id="editModeSelect">
+        <option value="edit" selected>Edycja — zmień zaznaczony obszar</option>
+        <option value="remove">Usuwanie obiektu — szersza maska</option>
+      </select>
+
       <label for="qualitySelectVisible">Jakość</label>
       <select id="qualitySelectVisible">
         <option value="fast">Szybki — bez refine, najszybszy</option>
@@ -134,6 +140,7 @@ function collectUi(rootNode) {
     promptInput: findPanelElement(rootNode, "promptInput"),
     qualitySelect: findPanelElement(rootNode, "qualitySelect"),
     qualitySelectVisible: findPanelElement(rootNode, "qualitySelectVisible"),
+    editModeSelect: findPanelElement(rootNode, "editModeSelect"),
     progressCard: findPanelElement(rootNode, "progressCard"),
     progressBar: findPanelElement(rootNode, "progressBar"),
     progressLabel: findPanelElement(rootNode, "progressLabel"),
@@ -423,6 +430,10 @@ function getQualityPreset() {
   return qualityPresets[value] || qualityPresets.balanced;
 }
 
+function getEditMode() {
+  return ui?.editModeSelect?.value === "remove" ? "remove" : "edit";
+}
+
 function getQualityPresetForSettings(settings) {
   return qualityPresets[settings?.quality] || qualityPresets.balanced;
 }
@@ -591,6 +602,10 @@ function buildInpaintingJob(
       negativePrompt: qualitySettings.negativePrompt,
       baseModelKind: "gguf",
       quality,
+      editMode: qualitySettings.editMode || "edit",
+      editModePlan: panelHelpers.resolveEditModePlan
+        ? panelHelpers.resolveEditModePlan(qualitySettings.editMode)
+        : { editMode: "edit", extraGrowPx: 0, backgroundPreserveThreshold: 0.1 },
       mask: {
         mode: "dual-mask",
         featherPx: visibilityMask.options?.featherPx ?? qualitySettings.maskFeatherPx,
@@ -1618,6 +1633,16 @@ function applyWorkflowInputs(workflow, mapping, job, comfyUploads) {
     const refineNodeId = job.generation.quality?.refineSourceNodeId || "93";
     setWorkflowInput(workflow, mapping.inputs.refineSource, [refineNodeId, 0]);
   }
+
+  // Removal mode trusts the generated background more so BackgroundPreserve
+  // doesn't restore the object when the new fill resembles the surroundings.
+  if (mapping.inputs.backgroundPreserveThreshold && job.generation.editModePlan) {
+    setWorkflowInput(
+      workflow,
+      mapping.inputs.backgroundPreserveThreshold,
+      job.generation.editModePlan.backgroundPreserveThreshold
+    );
+  }
   setWorkflowInput(workflow, mapping.inputs.seed, job.generation.activeSeed);
   setWorkflowInput(workflow, mapping.inputs.seedRandomize, "disable");
 
@@ -2537,6 +2562,7 @@ async function createInpaintingJobPackage() {
 
   const dataFolder = await getDataFolder();
   const qualitySettings = await loadQualitySettings();
+  qualitySettings.editMode = getEditMode(); // runtime override from the panel
   const loraConfig = await loadLoraConfig();
   const variantSeeds = createVariantSeeds(qualitySettings.variantCount);
   const exported = await exportInpaintingAssets(document, dataFolder, qualitySettings);
@@ -2748,6 +2774,16 @@ function initializePanel(rootNode) {
       }
       const preset = getQualityPreset();
       setMessage(`Jakość: ${preset.label} (${preset.steps} kroków${preset.refine ? ", refine" : ""}).`);
+    });
+  }
+
+  if (ui.editModeSelect) {
+    ui.editModeSelect.addEventListener("change", () => {
+      setMessage(
+        getEditMode() === "remove"
+          ? "Tryb: Usuwanie obiektu — maska zostanie poszerzona, by obiekt zniknął bez obwódki."
+          : "Tryb: Edycja — zmiana w obrębie zaznaczenia."
+      );
     });
   }
 

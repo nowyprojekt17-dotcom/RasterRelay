@@ -305,11 +305,31 @@
     return {
       schemaVersion: "rasterrelay.qualitySettings.v1",
       quality: ["fast", "balanced", "quality"].includes(settings.quality) ? settings.quality : "balanced",
+      editMode: ["edit", "remove"].includes(settings.editMode) ? settings.editMode : "edit",
       maskFeatherPx: clampNumber(settings.maskFeatherPx, 24, 0, 96),
       maskGrowPx: clampNumber(settings.maskGrowPx, 0, -64, 96),
       variantCount: Math.round(clampNumber(settings.variantCount, 1, 1, 2)),
       negativePrompt: String(settings.negativePrompt || defaultNegativePrompt).trim()
     };
+  }
+
+  // Extra generation-mask grow (px) for object removal: a selection usually
+  // clips the object's soft edge/shadow, leaving a rim. Removal repaints a
+  // wider band so the object disappears completely.
+  const removalExtraGrowPx = 20;
+
+  // Per-edit-mode workflow parameters applied at queue time.
+  function resolveEditModePlan(editMode) {
+    if (editMode === "remove") {
+      return {
+        editMode: "remove",
+        extraGrowPx: removalExtraGrowPx,
+        // trust the generated background more so the removal is never undone
+        // by BackgroundPreserve when the new fill resembles the surroundings
+        backgroundPreserveThreshold: 0.04
+      };
+    }
+    return { editMode: "edit", extraGrowPx: 0, backgroundPreserveThreshold: 0.1 };
   }
 
   function getGenerationMaskHaloPx(quality) {
@@ -350,15 +370,17 @@
   function getGenerationMaskOptions(settings = {}) {
     const normalized = normalizeQualitySettings(settings);
     const haloPx = getGenerationMaskHaloPx(normalized.quality);
+    const extraGrowPx = resolveEditModePlan(normalized.editMode).extraGrowPx;
     return {
       role: "generation",
       featherPx: Math.round(
         clampNumber(Math.max(normalized.maskFeatherPx, haloPx), haloPx, 0, maxMaskFeatherPx)
       ),
       growPx: Math.round(
-        clampNumber(Math.max(0, normalized.maskGrowPx) + haloPx, haloPx, 0, maxMaskGrowPx)
+        clampNumber(Math.max(0, normalized.maskGrowPx) + haloPx + extraGrowPx, haloPx, 0, maxMaskGrowPx)
       ),
-      haloPx
+      haloPx,
+      extraGrowPx
     };
   }
 
@@ -457,6 +479,7 @@
     insertDynamicLoraChain,
     normalizeQualitySettings,
     resolveQualityPlan,
+    resolveEditModePlan,
     parseLoraItems,
     parseLoraToken,
     setWorkflowInput,

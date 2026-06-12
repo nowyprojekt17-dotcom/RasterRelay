@@ -1,0 +1,180 @@
+[32m[INFO][0m setup plugin alembic.autogenerate.schemas
+[32m[INFO][0m setup plugin alembic.autogenerate.tables
+[32m[INFO][0m setup plugin alembic.autogenerate.types
+[32m[INFO][0m setup plugin alembic.autogenerate.constraints
+[32m[INFO][0m setup plugin alembic.autogenerate.defaults
+[32m[INFO][0m setup plugin alembic.autogenerate.comments
+[32m[INFO][0m 
+Prestartup times for custom nodes:
+[32m[INFO][0m    0.0 seconds: E:\AI\ComfyUI\custom_nodes\rgthree-comfy
+[32m[INFO][0m    2.8 seconds: E:\AI\ComfyUI\custom_nodes\ComfyUI-Manager
+[32m[INFO][0m 
+[1m[33m[WARNING][0m WARNING: You need pytorch with cu130 or higher to use optimized CUDA operations.
+[32m[INFO][0m Found comfy_kitchen backend eager: {'available': True, 'disabled': False, 'unavailable_reason': None, 'capabilities': ['apply_rope', 'apply_rope1', 'apply_rope_split_half', 'apply_rope_split_half1', 'dequantize_mxfp8', 'dequantize_nvfp4', 'dequantize_per_tensor_fp8', 'gemv_awq_w4a16', 'quantize_mxfp8', 'quantize_nvfp4', 'quantize_per_tensor_fp8', 'quantize_svdquant_w4a4', 'scaled_mm_mxfp8', 'scaled_mm_nvfp4', 'scaled_mm_svdquant_w4a4', 'stochastic_rounding_fp8']}
+[32m[INFO][0m Found comfy_kitchen backend triton: {'available': False, 'disabled': True, 'unavailable_reason': "ImportError: No module named 'triton'", 'capabilities': []}
+[32m[INFO][0m Found comfy_kitchen backend cuda: {'available': True, 'disabled': True, 'unavailable_reason': None, 'capabilities': ['apply_rope', 'apply_rope1', 'apply_rope_split_half', 'apply_rope_split_half1', 'dequantize_nvfp4', 'dequantize_per_tensor_fp8', 'gemv_awq_w4a16', 'quantize_mxfp8', 'quantize_nvfp4', 'quantize_per_tensor_fp8', 'quantize_svdquant_w4a4', 'scaled_mm_nvfp4', 'scaled_mm_svdquant_w4a4', 'stochastic_rounding_fp8']}
+[32m[INFO][0m Checkpoint files will always be loaded safely.
+[32m[INFO][0m Total VRAM 24575 MB, total RAM 32693 MB
+[32m[INFO][0m pytorch version: 2.11.0+cu128
+[32m[INFO][0m Set vram state to: NORMAL_VRAM
+[32m[INFO][0m Device: cuda:0 NVIDIA GeForce RTX 3090 : cudaMallocAsync
+[32m[INFO][0m Using async weight offloading with 2 streams
+[32m[INFO][0m Enabled pinned memory 13077.0
+[32m[INFO][0m Using pytorch attention
+aimdo: src-win/cuda-detour.c:38:INFO:aimdo_setup_hooks: installing 6 hooks
+aimdo: src-win/cuda-detour.c:28:DEBUG:install_hook_entries: hooks successfully installed
+aimdo: src-win/shmem-detect.c:80:INFO:comfy-aimdo WDDM adapter match: NVIDIA GeForce RTX 3090 runtime_luid=00000000:0000e53f dxgi_luid=00000000:0000e53f
+aimdo: src/control.c:237:INFO:comfy-aimdo inited for GPU: NVIDIA GeForce RTX 3090 (VRAM: 24575 MB)
+[32m[INFO][0m DynamicVRAM support detected and enabled
+[32m[INFO][0m Python version: 3.12.9 (tags/v3.12.9:fdb8142, Feb  4 2025, 15:27:58) [MSC v.1942 64 bit (AMD64)]
+[32m[INFO][0m ComfyUI version: 0.22.0
+[32m[INFO][0m comfy-aimdo version: 0.4.5
+[32m[INFO][0m comfy-kitchen version: 0.2.10
+[32m[INFO][0m comfyui-frontend-package version: 1.44.19
+[32m[INFO][0m comfyui-workflow-templates version: 0.9.82
+[32m[INFO][0m comfyui-embedded-docs version: 0.5.1
+[32m[INFO][0m comfy-kitchen version: 0.2.10
+[32m[INFO][0m comfy-aimdo version: 0.4.5
+[32m[INFO][0m [Prompt Server] web root: E:\AI\ComfyUI\.venv\Lib\site-packages\comfyui_frontend_package\static
+[32m[INFO][0m Asset seeder disabled
+[1m[33m[WARNING][0m Traceback (most recent call last):
+  File "E:\AI\ComfyUI\nodes.py", line 2204, in load_custom_node
+    module_spec.loader.exec_module(module)
+  File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "E:\AI\ComfyUI\custom_nodes\ComfyUI-Crystools\__init__.py", line 10, in <module>
+    from .core import version, logger
+  File "E:\AI\ComfyUI\custom_nodes\ComfyUI-Crystools\core\__init__.py", line 5, in <module>
+    from .common import *
+  File "E:\AI\ComfyUI\custom_nodes\ComfyUI-Crystools\core\common.py", line 4, in <module>
+    from deepdiff import DeepDiff
+ModuleNotFoundError: No module named 'deepdiff'
+
+[1m[33m[WARNING][0m Cannot import E:\AI\ComfyUI\custom_nodes\ComfyUI-Crystools module for custom nodes: No module named 'deepdiff'
+[32m[INFO][0m ComfyUI-GGUF: Allowing full torch compile
+[32m[INFO][0m ### Loading: ComfyUI-Impact-Pack (V8.28.3)
+[1m[31m[ERROR][0m [Impact Pack] Failed to import due to several dependencies are missing!!!!
+[1m[33m[WARNING][0m Traceback (most recent call last):
+  File "E:\AI\ComfyUI\nodes.py", line 2204, in load_custom_node
+    module_spec.loader.exec_module(module)
+  File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "E:\AI\ComfyUI\custom_nodes\ComfyUI-Impact-Pack\__init__.py", line 40, in <module>
+    raise e
+  File "E:\AI\ComfyUI\custom_nodes\ComfyUI-Impact-Pack\__init__.py", line 27, in <module>
+    import cv2                    # noqa: F401
+    ^^^^^^^^^^
+ModuleNotFoundError: No module named 'cv2'
+
+[1m[33m[WARNING][0m Cannot import E:\AI\ComfyUI\custom_nodes\ComfyUI-Impact-Pack module for custom nodes: No module named 'cv2'
+[32m[INFO][0m ### Loading: ComfyUI-Inspire-Pack (V1.23)
+[1m[33m[WARNING][0m Traceback (most recent call last):
+  File "E:\AI\ComfyUI\nodes.py", line 2204, in load_custom_node
+    module_spec.loader.exec_module(module)
+  File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "E:\AI\ComfyUI\custom_nodes\ComfyUI-Inspire-Pack\__init__.py", line 35, in <module>
+    imported_module = importlib.import_module(".inspire.{}".format(module_name), __name__)
+                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Program Files\Python312\Lib\importlib\__init__.py", line 90, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "<frozen importlib._bootstrap>", line 1387, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1360, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1331, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 935, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "E:\AI\ComfyUI\custom_nodes\ComfyUI-Inspire-Pack\inspire\lora_block_weight.py", line 16, in <module>
+    from .libs import utils
+  File "E:\AI\ComfyUI\custom_nodes\ComfyUI-Inspire-Pack\inspire\libs\utils.py", line 7, in <module>
+    import cv2
+ModuleNotFoundError: No module named 'cv2'
+
+[1m[33m[WARNING][0m Cannot import E:\AI\ComfyUI\custom_nodes\ComfyUI-Inspire-Pack module for custom nodes: No module named 'cv2'
+[1m[33m[WARNING][0m OpenCV not installed
+[32m[INFO][0m ### Loading: ComfyUI-Manager (V3.40)
+[32m[INFO][0m [ComfyUI-Manager] network_mode: public
+[32m[INFO][0m [ComfyUI-Manager] ComfyUI per-queue preview override detected (PR #11261). Manager's preview method feature is disabled. Use ComfyUI's --preview-method CLI option or 'Settings > Execution > Live preview method'.
+[32m[INFO][0m ### ComfyUI Version: v0.22.0-40-g04879a81 | Released on '2026-05-25'
+[1m[33m[WARNING][0m Traceback (most recent call last):
+  File "E:\AI\ComfyUI\nodes.py", line 2204, in load_custom_node
+    module_spec.loader.exec_module(module)
+  File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "E:\AI\ComfyUI\custom_nodes\ComfyUI-VideoHelperSuite\__init__.py", line 1, in <module>
+    from .videohelpersuite.nodes import NODE_CLASS_MAPPINGS, NODE_DISPLAY_NAME_MAPPINGS
+  File "E:\AI\ComfyUI\custom_nodes\ComfyUI-VideoHelperSuite\videohelpersuite\nodes.py", line 20, in <module>
+    from .load_video_nodes import LoadVideoUpload, LoadVideoPath, LoadVideoFFmpegUpload, LoadVideoFFmpegPath, LoadImagePath
+  File "E:\AI\ComfyUI\custom_nodes\ComfyUI-VideoHelperSuite\videohelpersuite\load_video_nodes.py", line 6, in <module>
+    import cv2
+ModuleNotFoundError: No module named 'cv2'
+
+[1m[33m[WARNING][0m Cannot import E:\AI\ComfyUI\custom_nodes\ComfyUI-VideoHelperSuite module for custom nodes: No module named 'cv2'
+[1m[33m[WARNING][0m Skip E:\AI\ComfyUI\custom_nodes\ComfyUI-WD14-Tagger module for custom nodes due to the lack of NODE_CLASS_MAPPINGS or comfy_entrypoint (need one).
+[1m[33m[WARNING][0m Traceback (most recent call last):
+  File "E:\AI\ComfyUI\nodes.py", line 2204, in load_custom_node
+    module_spec.loader.exec_module(module)
+  File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "E:\AI\ComfyUI\custom_nodes\comfyui_controlnet_aux\__init__.py", line 7, in <module>
+    from .utils import here, define_preprocessor_inputs, INPUT
+  File "E:\AI\ComfyUI\custom_nodes\comfyui_controlnet_aux\utils.py", line 4, in <module>
+    import cv2
+ModuleNotFoundError: No module named 'cv2'
+
+[1m[33m[WARNING][0m Cannot import E:\AI\ComfyUI\custom_nodes\comfyui_controlnet_aux module for custom nodes: No module named 'cv2'
+[1m[33m[WARNING][0m Traceback (most recent call last):
+  File "E:\AI\ComfyUI\nodes.py", line 2204, in load_custom_node
+    module_spec.loader.exec_module(module)
+  File "<frozen importlib._bootstrap_external>", line 999, in exec_module
+  File "<frozen importlib._bootstrap>", line 488, in _call_with_frames_removed
+  File "E:\AI\ComfyUI\custom_nodes\comfyui_segment_anything\__init__.py", line 1, in <module>
+    from .node import *
+  File "E:\AI\ComfyUI\custom_nodes\comfyui_segment_anything\node.py", line 16, in <module>
+    from sam_hq.predictor import SamPredictorHQ
+  File "E:\AI\ComfyUI\custom_nodes\comfyui_segment_anything\sam_hq\predictor.py", line 4, in <module>
+    from segment_anything import SamPredictor
+ModuleNotFoundError: No module named 'segment_anything'
+
+[1m[33m[WARNING][0m Cannot import E:\AI\ComfyUI\custom_nodes\comfyui_segment_anything module for custom nodes: No module named 'segment_anything'
+USDU batch patches applied successfully.
+[32m[INFO][0m USDU batch patches applied successfully.
+[32m[INFO][0m [ComfyUI-Manager] default cache updated: https://raw.githubusercontent.com/ltdrdata/ComfyUI-Manager/main/alter-list.json
+[32m[INFO][0m 
+Import times for custom nodes:
+[32m[INFO][0m    0.0 seconds: E:\AI\ComfyUI\custom_nodes\websocket_image_save.py
+[32m[INFO][0m    0.0 seconds: E:\AI\ComfyUI\custom_nodes\comfybridge_nodes
+[32m[INFO][0m    0.0 seconds: E:\AI\ComfyUI\custom_nodes\masquerade-nodes-comfyui
+[32m[INFO][0m    0.0 seconds: E:\AI\ComfyUI\custom_nodes\ComfyUI-Logic
+[32m[INFO][0m    0.0 seconds (IMPORT FAILED): E:\AI\ComfyUI\custom_nodes\comfyui_controlnet_aux
+[32m[INFO][0m    0.0 seconds (IMPORT FAILED): E:\AI\ComfyUI\custom_nodes\ComfyUI-WD14-Tagger
+[32m[INFO][0m    0.0 seconds: E:\AI\ComfyUI\custom_nodes\comfyui-lama-remover
+[32m[INFO][0m    0.0 seconds (IMPORT FAILED): E:\AI\ComfyUI\custom_nodes\ComfyUI-Impact-Pack
+[32m[INFO][0m    0.0 seconds (IMPORT FAILED): E:\AI\ComfyUI\custom_nodes\comfyui_segment_anything
+[32m[INFO][0m    0.0 seconds (IMPORT FAILED): E:\AI\ComfyUI\custom_nodes\ComfyUI-Inspire-Pack
+[32m[INFO][0m    0.0 seconds: E:\AI\ComfyUI\custom_nodes\ComfyUI_IPAdapter_plus
+[32m[INFO][0m    0.0 seconds (IMPORT FAILED): E:\AI\ComfyUI\custom_nodes\ComfyUI-Crystools
+[32m[INFO][0m    0.0 seconds: E:\AI\ComfyUI\custom_nodes\ComfyUI-Custom-Scripts
+[32m[INFO][0m    0.0 seconds: E:\AI\ComfyUI\custom_nodes\rasterrelay_nodes
+[32m[INFO][0m    0.0 seconds: E:\AI\ComfyUI\custom_nodes\Derfuu_ComfyUI_ModdedNodes
+[32m[INFO][0m    0.0 seconds: E:\AI\ComfyUI\custom_nodes\efficiency-nodes-comfyui
+[32m[INFO][0m    0.0 seconds: E:\AI\ComfyUI\custom_nodes\ComfyUI_UltimateSDUpscale
+[32m[INFO][0m    0.0 seconds: E:\AI\ComfyUI\custom_nodes\ComfyUI-Advanced-ControlNet
+[32m[INFO][0m    0.0 seconds (IMPORT FAILED): E:\AI\ComfyUI\custom_nodes\ComfyUI-VideoHelperSuite
+[32m[INFO][0m    0.0 seconds: E:\AI\ComfyUI\custom_nodes\rgthree-comfy
+[32m[INFO][0m    0.0 seconds: E:\AI\ComfyUI\custom_nodes\ComfyUI-KJNodes
+[32m[INFO][0m    0.0 seconds: E:\AI\ComfyUI\custom_nodes\ComfyUI_essentials
+[32m[INFO][0m    0.2 seconds: E:\AI\ComfyUI\custom_nodes\ComfyUI-GGUF
+[32m[INFO][0m    0.6 seconds: E:\AI\ComfyUI\custom_nodes\ComfyUI-Manager
+[32m[INFO][0m 
+[32m[INFO][0m Context impl SQLiteImpl.
+[32m[INFO][0m Will assume non-transactional DDL.
+[32m[INFO][0m Using RAM pressure cache.
+[32m[INFO][0m Starting server
+
+[32m[INFO][0m To see the GUI go to: http://127.0.0.1:8188
+[32m[INFO][0m [ComfyUI-Manager] default cache updated: https://raw.githubusercontent.com/ltdrdata/ComfyUI-Manager/main/extension-node-map.json
+[32m[INFO][0m [ComfyUI-Manager] default cache updated: https://raw.githubusercontent.com/ltdrdata/ComfyUI-Manager/main/model-list.json
+[32m[INFO][0m [ComfyUI-Manager] default cache updated: https://raw.githubusercontent.com/ltdrdata/ComfyUI-Manager/main/custom-node-list.json
+[32m[INFO][0m [ComfyUI-Manager] default cache updated: https://raw.githubusercontent.com/ltdrdata/ComfyUI-Manager/main/github-stats.json

@@ -361,3 +361,20 @@ test("resolveQualityPlan falls back to balanced for unknown names", () => {
   assert.equal(r.name, "balanced");
   assert.equal(r.refineSourceNodeId, "93");
 });
+
+test("resolveEditModePlan: remove widens mask and lowers preserve threshold", () => {
+  const edit = helpers.resolveEditModePlan("edit");
+  assert.equal(edit.extraGrowPx, 0);
+  assert.equal(edit.backgroundPreserveThreshold, 0.1);
+
+  const remove = helpers.resolveEditModePlan("remove");
+  assert.ok(remove.extraGrowPx > 0);
+  assert.ok(remove.backgroundPreserveThreshold < edit.backgroundPreserveThreshold);
+});
+
+test("getGenerationMaskOptions grows more in removal mode", () => {
+  const editOpts = helpers.getGenerationMaskOptions({ quality: "balanced", editMode: "edit" });
+  const removeOpts = helpers.getGenerationMaskOptions({ quality: "balanced", editMode: "remove" });
+  assert.ok(removeOpts.growPx > editOpts.growPx, `${removeOpts.growPx} > ${editOpts.growPx}`);
+  assert.equal(removeOpts.growPx - editOpts.growPx, removeOpts.extraGrowPx);
+});

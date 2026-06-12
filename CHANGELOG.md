@@ -7,6 +7,16 @@ a ten projekt adheres to [Semantic Versioning](https://semver.org/lang/pl/).
 
 ## [Unreleased]
 
+### Added (Tier 2 — produkt/DX)
+- **Tryb „Usuwanie obiektu"** (selektor w panelu): poszerza maskę generacji
+  o +20 px (obiekt znika bez obwódki) i obniża próg `BackgroundPreserve`
+  (0.10→0.04), żeby usunięcie nie było cofane, gdy nowe tło przypomina
+  otoczenie. Zmierzone: „duch" usuwanego obiektu 0.988→0.898 (mniejszy wkład
+  kompozycji w ghosting). `backgroundPreserveThreshold` celuje teraz w oba
+  węzły BgPreserve (95 + 89).
+- **`scripts/reload-rasterrelay-nodes.ps1`** — jedno polecenie: reinstall
+  węzłów + restart ComfyUI + sprawdzenie gotowości (auto-detekcja Pythona).
+
 ### Added (Tier 1 — UX/wydajność)
 - **Presety jakości w panelu (widoczny selektor):** Szybki (8 kroków, bez
   refine), Dobra jakość (14, bez refine, domyślny), Maks (20, z refine).

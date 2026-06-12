@@ -150,10 +150,16 @@
       "nodeId": "13",
       "inputName": "strength"
     },
-    "backgroundPreserveThreshold": {
-      "nodeId": "95",
-      "inputName": "change_keep_threshold"
-    },
+    "backgroundPreserveThreshold": [
+      {
+        "nodeId": "95",
+        "inputName": "change_keep_threshold"
+      },
+      {
+        "nodeId": "89",
+        "inputName": "change_keep_threshold"
+      }
+    ],
     "refineDenoise": {
       "nodeId": "72",
       "inputName": "denoise"
