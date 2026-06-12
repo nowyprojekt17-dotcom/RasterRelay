@@ -13,13 +13,14 @@ Custom nodes for the RasterRelay Photoshop-to-ComfyUI inpainting bridge.
 | `RasterRelaySmartCropTrimmer` | RasterRelay | Removes grid-alignment padding and restores the original crop dimensions |
 | `RasterRelayGrainInjector` | RasterRelay | Adds reference-matched micro-grain to generated regions |
 | `RasterRelayVaeDriftMatch` | RasterRelay | Restores unmasked original pixels after generation to remove VAE/scale/color drift |
+| `RasterRelayColorHarmonize` | RasterRelay | Matches colors of generated region to surrounding original using Reinhard LAB transfer |
 
 ## Alignment workflow
 
 The alignment nodes are designed for Photoshop edits where users may later adjust the generated layer mask. The safest order is:
 
 ```text
-SmartCropAligner -> model/VAE path -> SmartCropTrimmer -> VaeDriftMatch -> PadToDocument -> SaveImage
+SmartCropAligner -> model/VAE path -> SmartCropTrimmer -> VaeDriftMatch -> ColorHarmonize -> PadToDocument -> SaveImage
 ```
 
 `RasterRelaySmartCropAligner` avoids the common "slightly zoomed" look by padding the crop outward to a grid-safe size instead of scaling the crop. `RasterRelayVaeDriftMatch` should run late in the chain because it restores every pixel where the mask is `0` back to the exact Photoshop source pixel.
@@ -30,7 +31,16 @@ For Photoshop layer-mask output, `RasterRelayVaeDriftMatch` defaults to `mask_mo
 
 RasterRelay uses a dual-mask handoff for FLUX.2 inpainting. The mask uploaded to ComfyUI is a generation/denoise support mask with an automatic quality-dependent halo, while the Photoshop layer mask remains the user-facing visibility mask. This gives FLUX.2 Klein more transition context without making the final layer visibly larger.
 
-Automatic color/tonal harmonization has been removed from the production workflow. Future color matching should be planned as a separate approach rather than hidden in the default path.
+`RasterRelayColorHarmonize` addresses color mismatch between the AI-generated inpainted region and the surrounding original image. It uses Reinhard color transfer in LAB color space to match the color statistics (mean and standard deviation) of the generated region to the reference area around the mask. The node applies correction only inside the mask with Gaussian-blurred edges for seamless blending.
+
+Parameters:
+- `strength` (0.0-1.0): Intensity of color correction. 0.0 leaves the image unchanged, 1.0 applies full correction.
+- `blend_radius` (0-50): Radius of Gaussian blur at mask edges for smooth transitions.
+- `margin` (5-100): Pixel margin around the mask used to sample reference color statistics from the original image.
+
+ColorHarmonize should run after `VaeDriftMatch` in the pipeline. While `VaeDriftMatch` restores exact original pixels in unmasked regions, `ColorHarmonize` fixes the color tone inside the generated region to match the surrounding context.
+
+Automatic color/tonal harmonization is now available through `RasterRelayColorHarmonize` as an optional post-processing step. It is not applied by default, allowing users to control color correction intensity per-image.
 
 ## Tests
 
@@ -48,7 +58,7 @@ The practical alignment regression test uses a real source image and a non-grid 
 powershell -ExecutionPolicy Bypass -File scripts/practical-alignment-test.ps1
 ```
 
-It writes artifacts and `REPORT.md` under `Testy/Wyniki testów/<timestamp>-alignment-practical-test`.
+It writes artifacts and `REPORT.md` under `tests/manual/test-results/<timestamp>-alignment-practical-test`.
 
 ## LoRA behavior
 

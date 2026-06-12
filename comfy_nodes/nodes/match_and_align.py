@@ -1,11 +1,60 @@
 import torch
 import torch.nn.functional as F
 
+# Try relative import first (when loaded as part of package),
+# fall back to local implementation (when loaded directly in tests)
+try:
+    from ..utils.mask_processing import blur_mask as _shared_blur_mask
+    def blur_mask(mask, blend_radius):
+        return _shared_blur_mask(mask, blend_radius)
+except (ImportError, SystemError):
+    def _gaussian_kernel(kernel_size, sigma):
+        x = torch.arange(kernel_size, dtype=torch.float32) - (kernel_size - 1) / 2
+        kernel = torch.exp(-0.5 * (x / sigma) ** 2)
+        kernel = kernel / kernel.sum()
+        return kernel
+
+    def blur_mask(mask, blend_radius):
+        if blend_radius <= 0:
+            return mask
+
+        device = mask.device
+        kernel_size = blend_radius * 6 + 1
+        if kernel_size % 2 == 0:
+            kernel_size += 1
+        sigma = blend_radius / 3.0
+
+        kernel = _gaussian_kernel(kernel_size, sigma).to(device)
+
+        m_bchw = mask.permute(0, 3, 1, 2)
+
+        # Separable 1D Gaussian horizontal pass
+        m_bchw = F.pad(m_bchw, (kernel_size // 2, kernel_size // 2, 0, 0), mode="replicate")
+        kernel_h = kernel.view(1, 1, 1, kernel_size)
+        m_bchw = F.conv2d(m_bchw, kernel_h, padding="valid")
+
+        # Vertical pass
+        m_bchw = F.pad(m_bchw, (0, 0, kernel_size // 2, kernel_size // 2), mode="replicate")
+        kernel_v = kernel.view(1, 1, kernel_size, 1)
+        m_bchw = F.conv2d(m_bchw, kernel_v, padding="valid")
+
+        return m_bchw.permute(0, 2, 3, 1)
+
 
 class RasterRelaySmartCropAligner:
     """
     Pads the crop area outward to match the grid requirements of the model (e.g. 16 or 64 px)
     without stretching/resizing the pixels, preserving 1:1 scale.
+
+    Example:
+        >>> aligner = RasterRelaySmartCropAligner()
+        >>> aligned_img, aligned_mask, pad_l, pad_t, pad_r, pad_b = aligner.align(
+        ...     document_image, document_mask,
+        ...     crop_left=100, crop_top=200,
+        ...     crop_width=513, crop_height=385,
+        ...     grid_size=16
+        ... )
+        # crop 513x385 -> aligned 528x376 (next multiples of 16)
     """
     CATEGORY = "RasterRelay"
     RETURN_TYPES = ("IMAGE", "MASK", "INT", "INT", "INT", "INT")
@@ -99,6 +148,15 @@ class RasterRelaySmartCropTrimmer:
     """
     Crops away the extra aligned padding added by RasterRelaySmartCropAligner,
     returning the generated image back to the original crop dimensions.
+
+    Example:
+        >>> trimmer = RasterRelaySmartCropTrimmer()
+        >>> trimmed_img, trimmed_mask = trimmer.trim(
+        ...     generated_image, generated_mask,
+        ...     pad_left=8, pad_top=8,
+        ...     pad_right=7, pad_bottom=6
+        ... )
+        # Removes padding to restore original crop size
     """
     CATEGORY = "RasterRelay"
     RETURN_TYPES = ("IMAGE", "MASK")
@@ -140,6 +198,14 @@ class RasterRelayVaeDriftMatch:
     Forces the unmasked (original reference) regions of the generated image to be
     mathematically identical to the original crop, preventing VAE drift.
     Blends the edges smoothly to avoid any visible seam.
+
+    Example:
+        >>> matcher = RasterRelayVaeDriftMatch()
+        >>> matched = matcher.match_drift(
+        ...     original_crop, generated_crop, mask,
+        ...     blend_radius=12, restore_unmasked=True
+        ... )
+        # Unmasked pixels are identical to original, edges are smoothly blended
     """
     CATEGORY = "RasterRelay"
     RETURN_TYPES = ("IMAGE",)
@@ -164,39 +230,6 @@ class RasterRelayVaeDriftMatch:
                 }),
             },
         }
-
-    @staticmethod
-    def _gaussian_kernel(kernel_size, sigma):
-        x = torch.arange(kernel_size, dtype=torch.float32) - (kernel_size - 1) / 2
-        kernel = torch.exp(-0.5 * (x / sigma) ** 2)
-        kernel = kernel / kernel.sum()
-        return kernel
-
-    def _blur_mask(self, mask, blend_radius):
-        if blend_radius <= 0:
-            return mask
-
-        device = mask.device
-        kernel_size = blend_radius * 6 + 1
-        if kernel_size % 2 == 0:
-            kernel_size += 1
-        sigma = blend_radius / 3.0
-
-        kernel = self._gaussian_kernel(kernel_size, sigma).to(device)
-
-        m_bchw = mask.permute(0, 3, 1, 2)
-
-        # Separable 1D Gaussian horizontal pass
-        m_bchw = F.pad(m_bchw, (kernel_size // 2, kernel_size // 2, 0, 0), mode="replicate")
-        kernel_h = kernel.view(1, 1, 1, kernel_size)
-        m_bchw = F.conv2d(m_bchw, kernel_h, padding="valid")
-
-        # Vertical pass
-        m_bchw = F.pad(m_bchw, (0, 0, kernel_size // 2, kernel_size // 2), mode="replicate")
-        kernel_v = kernel.view(1, 1, kernel_size, 1)
-        m_bchw = F.conv2d(m_bchw, kernel_v, padding="valid")
-
-        return m_bchw.permute(0, 2, 3, 1)
 
     @staticmethod
     def _resize_image(image, height, width):
@@ -237,7 +270,7 @@ class RasterRelayVaeDriftMatch:
             mask = mask_resized.permute(0, 2, 3, 1)
 
         if mask_mode == "soft":
-            content_mask = self._blur_mask(mask, blend_radius)
+            content_mask = blur_mask(mask, blend_radius)
         else:
             # For Photoshop layer-mask workflows, the layer content must not be
             # pre-feathered by the same mask. Otherwise the edge gets blended
@@ -268,6 +301,11 @@ class RasterRelayVaeDriftMatch:
         if c_gen == 4 and composited.shape[-1] == 3:
             composited = torch.cat([composited, gen[..., 3:]], dim=-1)
 
+        # Zwolnij pamięć GPU po dużych operacjach
+        del orig, gen, orig_rgb, gen_rgb, content_mask, mask, exact_unmasked
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
+
         return (composited.clamp(0.0, 1.0),)
 
 
@@ -275,6 +313,14 @@ class RasterRelayGrainInjector:
     """
     Extracts the fine micro-texture/grain from the original image reference area
     and injects it into the generated area, ensuring seamless blending of noise.
+
+    Example:
+        >>> injector = RasterRelayGrainInjector()
+        >>> grained = injector.inject_grain(
+        ...     original_crop, generated_crop, mask,
+        ...     grain_strength=1.0
+        ... )
+        # Grain from original is injected into generated region
     """
     CATEGORY = "RasterRelay"
     RETURN_TYPES = ("IMAGE",)

@@ -68,6 +68,25 @@
     return Math.ceil(Math.max(1, Math.round(value || 1)) / normalizedMultiple) * normalizedMultiple;
   }
 
+  function computeOptimalGenSize(cropWidth, cropHeight, options = {}) {
+    // Phase D crop-engine (resolution guard-rail): crops at or below the
+    // model's comfortable area (~1.15 MP) generate at NATIVE size (measured:
+    // upscaling small crops gives no sharpness gain on Flux2 Klein and
+    // weakens the edit). Huge crops get a controlled DOWNSCALE for
+    // speed/VRAM and the model's trained resolution; the workflow scales
+    // the result back to the native crop.
+    const targetArea = options.targetArea || 1152 * 1024;
+    const minScale = options.minScale || 0.5;
+    const maxScale = options.maxScale || 1.0;
+    const multiple = options.multiple || 16;
+    const w = Math.max(1, Math.round(cropWidth));
+    const h = Math.max(1, Math.round(cropHeight));
+    const scale = Math.min(maxScale, Math.max(minScale, Math.sqrt(targetArea / (w * h))));
+    const genWidth = Math.max(multiple, Math.round((w * scale) / multiple) * multiple);
+    const genHeight = Math.max(multiple, Math.round((h * scale) / multiple) * multiple);
+    return { genWidth, genHeight, scale };
+  }
+
   function calculateGenerationBounds(cropBounds, docWidth, docHeight, multiple = 16) {
     const documentWidth = Math.max(1, Math.round(docWidth));
     const documentHeight = Math.max(1, Math.round(docHeight));
@@ -276,28 +295,15 @@
     };
   }
 
-  const taskModePrompts = {
-    replaceObject:
-      "Replace only the selected object. Preserve hands, fingers, perspective, lighting, background, shadows and surrounding details.",
-    removeTextLogo:
-      "Remove readable text, logos and numbers only inside the mask. Reconstruct the original material, reflections, panel lines and texture. Do not create new readable letters.",
-    detailRepair:
-      "Repair only the selected detail. Keep the rest of the image unchanged. Preserve texture, lighting, edges and scale.",
-    backgroundClean:
-      "Fill the selected area with matching background. Preserve depth of field, lighting, grain, color and surrounding structure."
-  };
+  const universalEditPrompt =
+    "Edit only the selected masked area according to the user's request. Keep the result photorealistic and naturally integrated with the original image. Match the surrounding perspective, lighting, shadows, color temperature, exposure, contrast, grain, texture sharpness and depth of field. Preserve unmasked areas exactly. Avoid visible seams, halos, pasted-on edges or color shifts between generated pixels and the original image.";
 
   const defaultNegativePrompt =
     "hard square edges, visible seams, distorted hands, extra fingers, unreadable artifacts, duplicated object, damaged background";
 
-  function normalizeTaskMode(mode) {
-    return Object.prototype.hasOwnProperty.call(taskModePrompts, mode) ? mode : "replaceObject";
-  }
-
   function normalizeQualitySettings(settings = {}) {
     return {
       schemaVersion: "rasterrelay.qualitySettings.v1",
-      taskMode: normalizeTaskMode(settings.taskMode),
       quality: ["fast", "balanced", "quality"].includes(settings.quality) ? settings.quality : "balanced",
       maskFeatherPx: clampNumber(settings.maskFeatherPx, 24, 0, 96),
       maskGrowPx: clampNumber(settings.maskGrowPx, 0, -64, 96),
@@ -310,12 +316,33 @@
     return generationMaskHaloPxByQuality[quality] || generationMaskHaloPxByQuality.balanced;
   }
 
+  // Single source of truth for quality presets. `refine` toggles the Phase-B
+  // refine pass: when off, the workflow's SeamlessTone reads the base result
+  // (node 93) and ComfyUI prunes the whole refine branch (faster); when on it
+  // reads the refined result (node 89, smoothest internal blend).
+  const qualityPlans = {
+    fast: { steps: 8, refine: false },
+    balanced: { steps: 14, refine: false },
+    quality: { steps: 20, refine: true }
+  };
+
+  function resolveQualityPlan(quality) {
+    const name = qualityPlans[quality] ? quality : "balanced";
+    const plan = qualityPlans[name];
+    return {
+      name,
+      steps: plan.steps,
+      refine: plan.refine,
+      refineSourceNodeId: plan.refine ? "89" : "93"
+    };
+  }
+
   function getVisibilityMaskOptions(settings = {}) {
     const normalized = normalizeQualitySettings(settings);
     return {
       role: "visibility",
       featherPx: Math.round(normalized.maskFeatherPx),
-      growPx: Math.round(normalized.maskGrowPx),
+      growPx: Math.min(0, Math.round(normalized.maskGrowPx)),
       haloPx: 0
     };
   }
@@ -343,10 +370,8 @@
   }
 
   function buildFinalPrompt(settings, userPrompt) {
-    const normalized = normalizeQualitySettings(settings);
-    const basePrompt = taskModePrompts[normalized.taskMode];
     const cleanUserPrompt = String(userPrompt || "").trim();
-    return cleanUserPrompt ? `${basePrompt} User request: ${cleanUserPrompt}` : basePrompt;
+    return cleanUserPrompt ? `${universalEditPrompt} User request: ${cleanUserPrompt}` : universalEditPrompt;
   }
 
   function setWorkflowInput(workflow, mappingItem, value) {
@@ -419,6 +444,7 @@
     calculatePaddedBounds,
     calculateGenerationBounds,
     clampNumber,
+    computeOptimalGenSize,
     defaultNegativePrompt,
     analyzeMask,
     buildFinalPrompt,
@@ -430,11 +456,12 @@
     hasSoftEdge,
     insertDynamicLoraChain,
     normalizeQualitySettings,
+    resolveQualityPlan,
     parseLoraItems,
     parseLoraToken,
     setWorkflowInput,
     softenGrayscaleMask,
-    taskModePrompts
+    universalEditPrompt
   };
 
   root.RasterRelayPanelHelpers = helpers;

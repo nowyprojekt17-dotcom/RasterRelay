@@ -10,7 +10,7 @@
 param(
     [string]$ComfyUrl = "http://127.0.0.1:8188",
     [string]$ComfyRoot = "E:\AI\ComfyUI",
-    [string]$SourceImage = "C:\Users\Mierz\Desktop\RasterRelay\Testy\Obrazy do testowania\envato-labs-ai-da532839-090d-4b70-9e60-1ed61c2e94a5.jpg",
+    [string]$SourceImage = "C:\Users\Mierz\Desktop\RasterRelay\tests\manual\test-images\envato-labs-ai-da532839-090d-4b70-9e60-1ed61c2e94a5.jpg",
     [string]$Prompt = "a wooden cutting board with a fresh loaf of bread and a knife, warm kitchen lighting, photorealistic, soft shadows",
     [int]$Steps = 14,
     [string]$OutputSubdir = "RasterRelay/practical-test"
@@ -195,7 +195,7 @@ $resultFullPath = Join-Path (Join-Path $outputDir $resultSubfolder) $resultFilen
 Write-Step "Result PNG: $resultFullPath"
 
 # Download to a local test directory for inspection
-$localResultDir = Join-Path $repoRoot "Testy\Wyniki testów\$(Get-Date -Format 'yyyy-MM-dd-HHmmss')-practical-test"
+$localResultDir = Join-Path $repoRoot "tests\manual\test-results\$(Get-Date -Format 'yyyy-MM-dd-HHmmss')-practical-test"
 New-Item -ItemType Directory -Path $localResultDir -Force | Out-Null
 $localResultPath = Join-Path $localResultDir "padded-output.png"
 Copy-Item $resultFullPath $localResultPath

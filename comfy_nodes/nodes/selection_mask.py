@@ -2,11 +2,36 @@ import base64
 import numpy as np
 import torch
 
+# Try relative import first (when loaded as part of package),
+# fall back to local implementation (when loaded directly in tests)
+try:
+    from ..utils.mask_processing import gaussian_kernel as _shared_gaussian_kernel
+    def _gaussian_kernel_local(kernel_size, sigma):
+        return _shared_gaussian_kernel(kernel_size, sigma)
+except (ImportError, SystemError):
+    def _gaussian_kernel_local(kernel_size, sigma):
+        """Create a 1D Gaussian kernel."""
+        x = torch.arange(kernel_size, dtype=torch.float32) - (kernel_size - 1) / 2
+        kernel = torch.exp(-0.5 * (x / sigma) ** 2)
+        kernel = kernel / kernel.sum()
+        return kernel
+
 
 class RasterRelaySelectionMask:
     """
     Creates a MASK tensor from raw Photoshop selection pixel data.
     Handles feathering on GPU via PyTorch convolutions.
+
+    Example:
+        >>> node = RasterRelaySelectionMask()
+        >>> mask = node.create_mask(
+        ...     selection_pixels=base64_data,
+        ...     sel_width=256, sel_height=256,
+        ...     mask_width=1024, mask_height=1024,
+        ...     sel_left=100, sel_top=50,
+        ...     feather=12
+        ... )
+        # Returns MASK tensor ready for ComfyUI workflow
     """
     CATEGORY = "RasterRelay"
     RETURN_TYPES = ("MASK",)
@@ -111,7 +136,7 @@ class RasterRelaySelectionMask:
                 kernel_size += 1
 
             sigma = feather / 3.0
-            kernel = self._gaussian_kernel(kernel_size, sigma)
+            kernel = _gaussian_kernel_local(kernel_size, sigma)
 
             mask = mask.unsqueeze(0)
             kernel = kernel.view(1, 1, 1, kernel_size).to(mask.device)
@@ -128,11 +153,3 @@ class RasterRelaySelectionMask:
             mask = mask.squeeze(0)
 
         return (mask,)
-
-    @staticmethod
-    def _gaussian_kernel(kernel_size, sigma):
-        """Create a 1D Gaussian kernel."""
-        x = torch.arange(kernel_size, dtype=torch.float32) - (kernel_size - 1) / 2
-        kernel = torch.exp(-0.5 * (x / sigma) ** 2)
-        kernel = kernel / kernel.sum()
-        return kernel

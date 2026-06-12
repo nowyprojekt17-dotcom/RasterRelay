@@ -7,6 +7,16 @@ from .match_and_align import (
     RasterRelayVaeDriftMatch,
     RasterRelayGrainInjector,
 )
+from .color_harmonize import RasterRelayColorHarmonize
+from .color_match import RasterRelayColorMatch
+from .grain_transfer import RasterRelayGrainTransfer
+from .edge_harmonize import RasterRelayEdgeHarmonize
+from .area_match import RasterRelayAreaMatch
+from .mask_cropper import RasterRelayMaskCropper
+from .background_preserve import RasterRelayBackgroundPreserve
+from .seamless_tone import RasterRelaySeamlessTone
+from .mask_edge_refine import RasterRelayMaskEdgeRefine
+from .color_calibrate import RasterRelayColorCalibrate
 
 __all__ = [
     "RasterRelaySelectionMask",
@@ -16,4 +26,14 @@ __all__ = [
     "RasterRelaySmartCropTrimmer",
     "RasterRelayVaeDriftMatch",
     "RasterRelayGrainInjector",
+    "RasterRelayGrainTransfer",
+    "RasterRelayColorHarmonize",
+    "RasterRelayColorMatch",
+    "RasterRelayEdgeHarmonize",
+    "RasterRelayAreaMatch",
+    "RasterRelayMaskCropper",
+    "RasterRelayBackgroundPreserve",
+    "RasterRelaySeamlessTone",
+    "RasterRelayMaskEdgeRefine",
+    "RasterRelayColorCalibrate",
 ]

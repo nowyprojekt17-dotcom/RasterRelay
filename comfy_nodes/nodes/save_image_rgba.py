@@ -2,7 +2,14 @@ import os
 import torch
 import numpy as np
 from PIL import Image
-import folder_paths
+
+# ComfyUI modules - optional imports for testing
+try:
+    import folder_paths
+    COMFYUI_AVAILABLE = True
+except ImportError:
+    COMFYUI_AVAILABLE = False
+    folder_paths = None
 
 
 class RasterRelaySaveImage:

@@ -22,8 +22,13 @@ photoshop_plugin/geometry-autostart.flag
 photoshop_plugin/*.log
 photoshop_plugin/rasterrelay-quality-settings.json
 photoshop_plugin/rasterrelay-lora-config.json
-Testy/Wyniki testów/
-Testy/Wyniki testĂłw/
-Testy/Wyniki testłółw/
-Testy/Wyniki testów/*.tmp
-Testy/Wyniki testów/*.log
+# Test results (generated)
+tests/manual/test-results/
+tests/manual/test-results/*.tmp
+tests/manual/test-results/*.log
+# Test image fixtures (binary, kept local only)
+tests/manual/test-images/
+
+# Local sqlite scratch DBs (created by MCP/bridge tooling at runtime)
+generations.db
+generations.db-*

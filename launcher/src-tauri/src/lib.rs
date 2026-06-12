@@ -264,7 +264,6 @@ struct RasterRelayEnvironmentStartResult {
 #[serde(rename_all = "camelCase")]
 struct QualitySettings {
     schema_version: String,
-    task_mode: String,
     quality: String,
     mask_feather_px: i32,
     mask_grow_px: i32,
@@ -737,7 +736,7 @@ fn start_uxp_developer_tools() -> UxpDeveloperToolsRuntimeActionResult {
         return UxpDeveloperToolsRuntimeActionResult {
             success: true,
             status,
-            message: "Adobe UXP Developer Tools jest juĹĽ uruchomione.".to_string(),
+            message: "Adobe UXP Developer Tools jest już uruchomione.".to_string(),
         };
     }
 
@@ -757,7 +756,7 @@ fn start_uxp_developer_tools() -> UxpDeveloperToolsRuntimeActionResult {
         Err(error) => UxpDeveloperToolsRuntimeActionResult {
             success: false,
             status: uxp_developer_tools_runtime_status(),
-            message: format!("Nie udaĹ‚o siÄ™ uruchomiÄ‡ Adobe UXP Developer Tools: {error}"),
+            message: format!("Nie udało się uruchomić Adobe UXP Developer Tools: {error}"),
         },
     }
 }
@@ -782,7 +781,7 @@ fn register_uxp_plugin() -> UxpPluginRegisterResult {
             return UxpPluginRegisterResult {
                 success: false,
                 status: uxp_developer_tools_runtime_status(),
-                message: format!("Nie udaĹ‚o siÄ™ przygotowaÄ‡ folderu Adobe UXP: {error}"),
+                message: format!("Nie udało się przygotować folderu Adobe UXP: {error}"),
             };
         }
     }
@@ -819,7 +818,7 @@ fn register_uxp_plugin() -> UxpPluginRegisterResult {
             return UxpPluginRegisterResult {
                 success: false,
                 status: uxp_developer_tools_runtime_status(),
-                message: format!("Nie udaĹ‚o siÄ™ zapisaÄ‡ listy wtyczek UXP: {error}"),
+                message: format!("Nie udało się zapisać listy wtyczek UXP: {error}"),
             }
         }
     };
@@ -829,15 +828,15 @@ fn register_uxp_plugin() -> UxpPluginRegisterResult {
             success: true,
             status: uxp_developer_tools_runtime_status(),
             message: if already_registered {
-                "RasterRelay juĹĽ jest na liĹ›cie wtyczek UXP.".to_string()
+                "RasterRelay już jest na liście wtyczek UXP.".to_string()
             } else {
-                "RasterRelay zostaĹ‚ dodany do listy wtyczek UXP. JeĹ›li UXP byĹ‚o otwarte, odĹ›wieĹĽ listÄ™ albo uruchom je ponownie.".to_string()
+                "RasterRelay został dodany do listy wtyczek UXP. Jeśli UXP było otwarte, odśwież listę albo uruchom je ponownie.".to_string()
             },
         },
         Err(error) => UxpPluginRegisterResult {
             success: false,
             status: uxp_developer_tools_runtime_status(),
-            message: format!("Nie udaĹ‚o siÄ™ zapisaÄ‡ listy wtyczek UXP: {error}"),
+            message: format!("Nie udało się zapisać listy wtyczek UXP: {error}"),
         },
     }
 }
@@ -2202,25 +2201,18 @@ fn quality_settings_path() -> PathBuf {
 fn default_quality_settings() -> QualitySettings {
     QualitySettings {
         schema_version: "rasterrelay.qualitySettings.v1".to_string(),
-        task_mode: "replaceObject".to_string(),
         quality: "balanced".to_string(),
         mask_feather_px: 24,
         mask_grow_px: 0,
         variant_count: 1,
         negative_prompt:
-            "hard square edges, visible seams, distorted hands, extra fingers, unreadable artifacts, duplicated object, damaged background"
+            "hard square edges, visible seams, halos, pasted-on edges, color mismatch, exposure mismatch, contrast mismatch, distorted hands, extra fingers, unreadable artifacts, duplicated object, damaged background"
                 .to_string(),
     }
 }
 
 fn normalize_quality_settings(settings: QualitySettings) -> QualitySettings {
     let mut normalized = default_quality_settings();
-    normalized.task_mode = match settings.task_mode.as_str() {
-        "replaceObject" | "removeTextLogo" | "detailRepair" | "backgroundClean" => {
-            settings.task_mode
-        }
-        _ => normalized.task_mode,
-    };
     normalized.quality = match settings.quality.as_str() {
         "fast" | "balanced" | "quality" => settings.quality,
         _ => normalized.quality,
@@ -2398,17 +2390,17 @@ fn uxp_developer_tools_runtime_status() -> UxpDeveloperToolsRuntimeStatus {
     let workspace_path = uxp_workspace_path();
     let plugin_registered = uxp_plugin_is_registered(&workspace_path, &plugin_manifest_path);
     let message = if running && plugin_registered {
-        "Adobe UXP Developer Tools jest uruchomione, a RasterRelay jest na liĹ›cie wtyczek."
+        "Adobe UXP Developer Tools jest uruchomione, a RasterRelay jest na liście wtyczek."
             .to_string()
     } else if running {
         "Adobe UXP Developer Tools jest uruchomione. Dodaj RasterRelay do listy wtyczek."
             .to_string()
     } else if installed && plugin_registered {
-        "Adobe UXP Developer Tools jest zainstalowane, a RasterRelay jest juĹĽ wpisany na listÄ™ wtyczek.".to_string()
+        "Adobe UXP Developer Tools jest zainstalowane, a RasterRelay jest już wpisany na listę wtyczek.".to_string()
     } else if installed {
-        "Adobe UXP Developer Tools jest zainstalowane. Uruchom je, ĹĽeby wczytaÄ‡ panel RasterRelay do Photoshopa.".to_string()
+        "Adobe UXP Developer Tools jest zainstalowane. Uruchom je, żeby wczytać panel RasterRelay do Photoshopa.".to_string()
     } else {
-        "Nie znaleziono Adobe UXP Developer Tools. Bez tego trudniej wczytaÄ‡ wtyczkÄ™ w trybie developerskim.".to_string()
+        "Nie znaleziono Adobe UXP Developer Tools. Bez tego trudniej wczytać wtyczkę w trybie developerskim.".to_string()
     };
 
     UxpDeveloperToolsRuntimeStatus {
