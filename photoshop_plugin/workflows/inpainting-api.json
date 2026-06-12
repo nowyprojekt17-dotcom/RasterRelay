@@ -221,7 +221,7 @@
     "class_type": "RasterRelayMaskEdgeRefine",
     "inputs": {
       "image": [
-        "10",
+        "65",
         0
       ],
       "mask": [
@@ -270,7 +270,9 @@
       ],
       "tone_radius": 40,
       "strength": 1.0,
-      "mode": "full"
+      "mode": "full",
+      "interior_strength": 0.15,
+      "seam_band": 24
     }
   },
   "97": {
@@ -290,7 +292,9 @@
       ],
       "tone_radius": 120,
       "strength": 0.85,
-      "mode": "chroma"
+      "mode": "chroma",
+      "interior_strength": 0.0,
+      "seam_band": 24
     }
   },
   "98": {
@@ -311,7 +315,8 @@
       "grain_strength": 0.8,
       "blur_radius": 3,
       "edge_feather": 16,
-      "preserve_luminance": true
+      "preserve_luminance": true,
+      "grain_clip": 0.04
     }
   },
   "91": {

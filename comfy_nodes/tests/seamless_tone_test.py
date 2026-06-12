@@ -71,6 +71,43 @@ def test_chroma_mode_preserves_luminance():
     assert dl_full > dl
 
 
+def test_interior_strength_preserves_intentional_edit():
+    """A recoloured patch (different colour AND brightness than surroundings)
+    must keep its character deep inside when interior_strength is low, while
+    the seam band is still corrected."""
+    size, box = 128, 64
+    orig = torch.full((1, size, size, 3), 0.6)           # bright neutral wall
+    gen = orig.clone()
+    mask = torch.zeros((1, size, size))
+    lo, hi = (size - box) // 2, (size + box) // 2
+    gen[:, lo:hi, lo:hi, 0] = 0.1                        # dark green patch
+    gen[:, lo:hi, lo:hi, 1] = 0.4
+    gen[:, lo:hi, lo:hi, 2] = 0.1
+    mask[:, lo:hi, lo:hi] = 1.0
+
+    node = RasterRelaySeamlessTone()
+    (out_old,) = node.match_tone(orig, gen, mask, tone_radius=16, strength=1.0,
+                                 interior_strength=1.0)
+    (out_new,) = node.match_tone(orig, gen, mask, tone_radius=16, strength=1.0,
+                                 interior_strength=0.15)
+
+    c = size // 2  # deep interior
+    def green(img, y, x):
+        px = img[0, y, x]
+        return (px[1] - (px[0] + px[2]) / 2).item()
+
+    green_gen = green(gen, c, c)
+    # old behaviour washes the green out badly; new keeps most of it
+    assert green(out_new, c, c) > 0.75 * green_gen, \
+        f"interior green lost: {green(out_new, c, c):.3f} vs {green_gen:.3f}"
+    assert green(out_new, c, c) > green(out_old, c, c)
+    # seam band is still corrected: just inside the boundary the new result
+    # moves toward the surroundings more than the raw patch
+    edge_y = lo + 2
+    assert (out_new[0, edge_y, c] - orig[0, edge_y, c]).abs().mean() < \
+           (gen[0, edge_y, c] - orig[0, edge_y, c]).abs().mean()
+
+
 def test_alpha_channel_preserved():
     orig, gen, mask, _ = _make_case()
     gen4 = torch.cat([gen, torch.full((1, gen.shape[1], gen.shape[2], 1), 0.5)], dim=-1)

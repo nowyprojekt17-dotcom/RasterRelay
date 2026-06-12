@@ -7,6 +7,19 @@ a ten projekt adheres to [Semantic Versioning](https://semver.org/lang/pl/).
 
 ## [Unreleased]
 
+### Fixed (hotfix po realnych testach: zielone włosy + usuwanie obiektów)
+- **SeamlessTone niszczył intencjonalne edycje**: pełna korekta tonu na całym
+  wnętrzu maski ciągnęła np. zielone włosy do beżu otoczenia (+0.13 jasności,
+  zieleń z +0.066 do zera). Teraz korekta jest ważona pasmem szwu
+  (`interior_strength`, `seam_band=24px`): pełna przy granicy, śladowa w głębi.
+  Zieleń zachowana w ~60%, szew bez regresji.
+- **GrainTransfer odrysowywał kontury usuwanych obiektów**: rezyduum
+  wysokoczęstotliwościowe na krawędziach (±0.3) to struktura, nie ziarno.
+  Teraz krawędzie są tłumione (zerowane z dylatacją ~3px, `grain_clip=0.04`)
+  — usuwanie obiektów czyste, ziarno nadal przenoszone.
+- **MaskEdgeRefine prowadzony obrazem WYGENEROWANYM** (nie oryginałem):
+  przy usuwaniu krawędzie usuwanego obiektu nie przyciągają już maski.
+
 ### Added
 - **Węzeł `RasterRelaySeamlessTone`** — bezszwowe dopasowanie jasności/koloru
   przez dyfuzję tonu otoczenia do wnętrza maski (niska częstotliwość,

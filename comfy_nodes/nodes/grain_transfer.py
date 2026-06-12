@@ -56,7 +56,13 @@ class RasterRelayGrainTransfer:
                     "default": True,
                     "tooltip": "Inject only the difference from local luma so the overall exposure doesn't drift.",
                 }),
-            }
+            },
+            "optional": {
+                "grain_clip": ("FLOAT", {
+                    "default": 0.04, "min": 0.005, "max": 1.0, "step": 0.005,
+                    "tooltip": "Max residual amplitude treated as grain. Edges/structure above this are clipped so removed objects don't leave ghost contours.",
+                }),
+            },
         }
 
     @staticmethod
@@ -119,8 +125,20 @@ class RasterRelayGrainTransfer:
         weights = torch.tensor([0.299, 0.587, 0.114], dtype=rgb.dtype, device=rgb.device)
         return (rgb * weights).sum(dim=-1, keepdim=True)
 
+    @staticmethod
+    def _suppress_structure(residual, grain_clip):
+        """Zero out residual at structural edges AND a small dilated margin
+        around them, so neither the edge core nor its low-amplitude skirt is
+        injected as a ghost contour. True grain (|r| <= clip away from edges)
+        passes through unchanged."""
+        edge = (residual.abs() > grain_clip).to(residual.dtype)  # BHW1
+        e = edge.permute(0, 3, 1, 2)
+        e = F.max_pool2d(e, kernel_size=7, stride=1, padding=3)  # dilate ~3px
+        keep = 1.0 - e.permute(0, 2, 3, 1)
+        return residual * keep
+
     def inject_grain(self, original_image, generated_image, mask, grain_strength,
-                     blur_radius, edge_feather, preserve_luminance):
+                     blur_radius, edge_feather, preserve_luminance, grain_clip=0.04):
         if grain_strength <= 0.0:
             return (generated_image.clone(),)
 
@@ -147,10 +165,15 @@ class RasterRelayGrainTransfer:
             mp = F.interpolate(mp, size=(h, w), mode="bilinear", align_corners=False)
             mask = mp.permute(0, 2, 3, 1)
 
-        # 1. Extract grain residual from original (luma only)
+        # 1. Extract grain residual from original (luma only).
+        # IMPORTANT: SUPPRESS (zero out) residual above grain amplitude — at
+        # object edges the residual is structure (±0.3+), not grain. Clamping
+        # would keep the coherent edge PATTERN at low amplitude, which still
+        # reads as a ghost contour on smooth surfaces; suppression removes it.
         orig_luma = self._luma(orig_rgb)
         orig_luma_blur = self._blur_luma(orig_luma, blur_radius)
         orig_grain = orig_luma - orig_luma_blur
+        orig_grain = self._suppress_structure(orig_grain, grain_clip)
 
         # If original and gen have different spatial sizes, resample grain to gen size.
         if orig_grain.shape[1:3] != (h, w):
@@ -162,6 +185,7 @@ class RasterRelayGrainTransfer:
         gen_luma = self._luma(gen_rgb)
         gen_luma_blur = self._blur_luma(gen_luma, blur_radius)
         gen_grain = gen_luma - gen_luma_blur
+        gen_grain = self._suppress_structure(gen_grain, grain_clip)
 
         # 3. Target grain residual = original residual - generated residual
         target_grain = (orig_grain - gen_grain) * grain_strength

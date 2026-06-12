@@ -21,14 +21,18 @@ wf = {
  "63": {"class_type": "CFGGuider", "inputs": {"model": ["22", 0], "positive": ["51", 0], "negative": ["52", 0], "cfg": 1}},
  "64": {"class_type": "SamplerCustomAdvanced", "inputs": {"noise": ["60", 0], "guider": ["63", 0], "sampler": ["61", 0], "sigmas": ["62", 0], "latent_image": ["42", 0]}},
  "65": {"class_type": "VAEDecode", "inputs": {"samples": ["64", 0], "vae": ["40", 0]}},
- # Phase C: edge-aware compositing mask (snaps to hair strands etc.)
- "13": {"class_type": "RasterRelayMaskEdgeRefine", "inputs": {"image": ["10", 0], "mask": ["11", 0], "radius": 8, "edge_sensitivity": 0.02, "strength": 1.0}},
+ # Phase C: edge-aware compositing mask. GUIDE = the GENERATED image (65), not
+ # the original: for recolours the silhouette matches anyway, and for removals
+ # the original object's edges must NOT pull the mask (ghost contours).
+ "13": {"class_type": "RasterRelayMaskEdgeRefine", "inputs": {"image": ["65", 0], "mask": ["11", 0], "radius": 8, "edge_sensitivity": 0.02, "strength": 1.0}},
  "94": {"class_type": "RasterRelayVaeDriftMatch", "inputs": {"original_crop": ["10", 0], "generated_crop": ["65", 0], "mask": ["13", 0], "blend_radius": 16, "restore_unmasked": True, "mask_mode": "soft"}},
- "96": {"class_type": "RasterRelaySeamlessTone", "inputs": {"original_image": ["10", 0], "generated_image": ["94", 0], "mask": ["13", 0], "tone_radius": 40, "strength": 1.0, "mode": "full"}},
- # Phase C: large-radius chroma-only pass kills residual colour cast without touching luminance
- "97": {"class_type": "RasterRelaySeamlessTone", "inputs": {"original_image": ["10", 0], "generated_image": ["96", 0], "mask": ["13", 0], "tone_radius": 120, "strength": 0.85, "mode": "chroma"}},
- # Phase C: photographic grain continuity from the original
- "98": {"class_type": "RasterRelayGrainTransfer", "inputs": {"original_image": ["10", 0], "generated_image": ["97", 0], "mask": ["13", 0], "grain_strength": 0.8, "blur_radius": 3, "edge_feather": 16, "preserve_luminance": True}},
+ # intent-preserving: full correction only in the seam band; deep interior
+ # keeps the model's intentional edit (recolours, removals, new objects)
+ "96": {"class_type": "RasterRelaySeamlessTone", "inputs": {"original_image": ["10", 0], "generated_image": ["94", 0], "mask": ["13", 0], "tone_radius": 40, "strength": 1.0, "mode": "full", "interior_strength": 0.15, "seam_band": 24}},
+ # Phase C: large-radius chroma-only pass kills residual colour cast AT THE SEAM ONLY
+ "97": {"class_type": "RasterRelaySeamlessTone", "inputs": {"original_image": ["10", 0], "generated_image": ["96", 0], "mask": ["13", 0], "tone_radius": 120, "strength": 0.85, "mode": "chroma", "interior_strength": 0.0, "seam_band": 24}},
+ # Phase C: photographic grain continuity (residual clamped so removed objects leave no ghost contours)
+ "98": {"class_type": "RasterRelayGrainTransfer", "inputs": {"original_image": ["10", 0], "generated_image": ["97", 0], "mask": ["13", 0], "grain_strength": 0.8, "blur_radius": 3, "edge_feather": 16, "preserve_luminance": True, "grain_clip": 0.04}},
  "91": {"class_type": "RasterRelayPadToDocument", "inputs": {"image": ["98", 0], "mask": ["13", 0], "crop_left": 0, "crop_top": 0, "crop_width": 1024, "crop_height": 768, "doc_width": 1024, "doc_height": 768, "alpha_mode": "crop"}},
  "80": {"class_type": "RasterRelaySaveImage", "inputs": {"images": ["91", 0], "filename_prefix": "RasterRelay/inpainting"}},
 }

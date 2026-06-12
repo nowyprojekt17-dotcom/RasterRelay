@@ -57,6 +57,14 @@ class RasterRelaySeamlessTone:
                     "default": "full",
                     "tooltip": "full = correct brightness and colour; chroma = correct only colour cast, keep the patch's luminance (useful as a 2nd large-radius pass).",
                 }),
+                "interior_strength": ("FLOAT", {
+                    "default": 1.0, "min": 0.0, "max": 1.0, "step": 0.05,
+                    "tooltip": "Correction weight DEEP INSIDE the mask. 1 = pull the whole patch toward the surroundings (texture continuation); low values (0-0.2) preserve intentional edits (recolors, new objects) and only enforce continuity at the seam.",
+                }),
+                "seam_band": ("INT", {
+                    "default": 0, "min": 0, "max": 400, "step": 1,
+                    "tooltip": "Width (px) of the full-correction band at the mask boundary. 0 = use tone_radius.",
+                }),
             },
         }
 
@@ -101,7 +109,8 @@ class RasterRelaySeamlessTone:
             blurred = F.interpolate(blurred, size=(x.shape[2], x.shape[3]), mode="bilinear", align_corners=False)
         return blurred
 
-    def match_tone(self, original_image, generated_image, mask, tone_radius, strength, mode="full"):
+    def match_tone(self, original_image, generated_image, mask, tone_radius, strength,
+                   mode="full", interior_strength=1.0, seam_band=0):
         if strength <= 0.0:
             return (generated_image.clone(),)
 
@@ -148,7 +157,19 @@ class RasterRelaySeamlessTone:
             lw = torch.tensor([0.2126, 0.7152, 0.0722], device=device, dtype=dtype).view(1, 3, 1, 1)
             corr_luma = (correction * lw).sum(dim=1, keepdim=True)
             correction = correction - corr_luma
-        result_bchw = gen_bchw + correction * mask.permute(0, 3, 1, 2)
+
+        mask_bchw = mask.permute(0, 3, 1, 2)
+        if interior_strength < 1.0:
+            # seam-weighted application: full correction in a band at the mask
+            # boundary (continuity), decaying to interior_strength deep inside
+            # so intentional edits (recolours, new objects) are preserved.
+            band = float(seam_band) if seam_band > 0 else sigma
+            interior_soft = self._blur_bchw(mask_bchw, band)
+            w_seam = ((1.0 - interior_soft) * 2.0).clamp(0.0, 1.0)
+            weight = interior_strength + (1.0 - interior_strength) * w_seam
+            correction = correction * weight
+
+        result_bchw = gen_bchw + correction * mask_bchw
         result = result_bchw.permute(0, 2, 3, 1).clamp(0.0, 1.0)
 
         if gen.shape[-1] == 4:
