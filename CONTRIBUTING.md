@@ -2,6 +2,21 @@
 
 Dziękujemy za zainteresowanie contributes do RasterRelay! Ten dokument zawiera wytyczne jak skutecznie contributesować do projektu.
 
+## Szybkie przeładowanie węzłów ComfyUI
+
+Węzły RasterRelay instalują się jako **kopia** w `ComfyUI/custom_nodes/`, więc
+po każdej zmianie w `comfy_nodes/` trzeba przeinstalować i zrestartować ComfyUI.
+Jedno polecenie robi wszystko (reinstall + restart + sprawdzenie gotowości):
+
+```powershell
+.\scripts\reload-rasterrelay-nodes.ps1
+# opcje: -ComfyRoot "E:\AI\ComfyUI" -Port 8188 -NoRestart
+```
+
+Skrypt sam wykrywa Pythona ComfyUI (venv/.venv/portable/system) i potwierdza, że
+węzły się załadowały. Przycisk w Launcherze, jeśli powstanie, będzie cienką
+nakładką na ten skrypt (logika restartu już jest w `start_comfyui`/`stop`).
+
 ## Struktura Projektu
 
 ```
