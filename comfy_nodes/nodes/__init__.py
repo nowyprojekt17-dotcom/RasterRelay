@@ -5,7 +5,6 @@ from .match_and_align import (
     RasterRelaySmartCropAligner,
     RasterRelaySmartCropTrimmer,
     RasterRelayVaeDriftMatch,
-    RasterRelayGrainInjector,
 )
 from .color_harmonize import RasterRelayColorHarmonize
 from .color_match import RasterRelayColorMatch
@@ -25,7 +24,6 @@ __all__ = [
     "RasterRelaySmartCropAligner",
     "RasterRelaySmartCropTrimmer",
     "RasterRelayVaeDriftMatch",
-    "RasterRelayGrainInjector",
     "RasterRelayGrainTransfer",
     "RasterRelayColorHarmonize",
     "RasterRelayColorMatch",

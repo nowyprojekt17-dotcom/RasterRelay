@@ -210,11 +210,12 @@ def gaussian_kernel(kernel_size: int, sigma: float) -> torch.Tensor
 > na całości — zdejmuje cast z intencji bez cofania zmiany semantycznej.
 >
 > **Uwaga o węzłach.** Powyżej jest *aktywny* łańcuch z `inpainting-api.json`.
-> Pozostałe węzły RasterRelay (`area_match`, `color_harmonize`, `color_match`,
-> `grain_transfer`, `edge_harmonize`, `background_preserve`, `selection_mask`,
-> warianty SmartCrop/GrainInjector z `match_and_align.py`) są **dostępne w
-> bibliotece**, ale nie są wpięte w domyślny workflow — celowe zaplecze do
-> dalszej pracy (np. transfer ziarna jako kolejny etap po SeamlessTone).
+> Węzły biblioteki (oznaczone `(biblioteka)` w menu ComfyUI: `area_match`,
+> `color_harmonize`, `color_match`, `edge_harmonize`, `selection_mask`,
+> `mask_cropper`, warianty SmartCrop z `match_and_align.py`) **nie są** w
+> domyślnym workflow — zaplecze/wcześniejsze podejścia. `AreaMatch`/`ColorHarmonize`
+> (globalny Reinhard) zostały zmierzone jako gorsze od `SeamlessTone` i zastąpione.
+> Pełną listę i podział aktywne/biblioteka opisuje `comfy_nodes/README.md`.
 
 ## Zarządzanie Pamięcią GPU
 

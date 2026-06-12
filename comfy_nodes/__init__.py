@@ -7,7 +7,6 @@ from .nodes.match_and_align import (
     RasterRelaySmartCropAligner,
     RasterRelaySmartCropTrimmer,
     RasterRelayVaeDriftMatch,
-    RasterRelayGrainInjector,
 )
 from .nodes.color_harmonize import RasterRelayColorHarmonize
 from .nodes.color_match import RasterRelayColorMatch
@@ -28,7 +27,6 @@ NODE_CLASS_MAPPINGS = {
     "RasterRelaySmartCropAligner": RasterRelaySmartCropAligner,
     "RasterRelaySmartCropTrimmer": RasterRelaySmartCropTrimmer,
     "RasterRelayVaeDriftMatch": RasterRelayVaeDriftMatch,
-    "RasterRelayGrainInjector": RasterRelayGrainInjector,
     "RasterRelayGrainTransfer": RasterRelayGrainTransfer,
     "RasterRelayColorHarmonize": RasterRelayColorHarmonize,
     "RasterRelayColorMatch": RasterRelayColorMatch,
@@ -42,20 +40,19 @@ NODE_CLASS_MAPPINGS = {
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
-    "RasterRelaySelectionMask": "RasterRelay Selection Mask",
+    "RasterRelaySelectionMask": "RasterRelay Selection Mask (biblioteka)",
     "RasterRelayLoraStack": "RasterRelay LoRA Stack",
     "RasterRelayPadToDocument": "RasterRelay Pad To Document",
     "RasterRelaySaveImage": "RasterRelay Save Image (RGBA)",
-    "RasterRelaySmartCropAligner": "RasterRelay Smart Crop Aligner",
-    "RasterRelaySmartCropTrimmer": "RasterRelay Smart Crop Trimmer",
+    "RasterRelaySmartCropAligner": "RasterRelay Smart Crop Aligner (biblioteka)",
+    "RasterRelaySmartCropTrimmer": "RasterRelay Smart Crop Trimmer (biblioteka)",
     "RasterRelayVaeDriftMatch": "RasterRelay VAE Drift Match",
-    "RasterRelayGrainInjector": "RasterRelay Grain Injector",
     "RasterRelayGrainTransfer": "RasterRelay Grain Transfer",
-    "RasterRelayColorHarmonize": "RasterRelay Color Harmonize",
-    "RasterRelayColorMatch": "RasterRelay Color Match",
-    "RasterRelayEdgeHarmonize": "RasterRelay Edge Harmonize",
-    "RasterRelayAreaMatch": "RasterRelay Area Match",
-    "RasterRelayMaskCropper": "RasterRelay Mask Cropper",
+    "RasterRelayColorHarmonize": "RasterRelay Color Harmonize (biblioteka)",
+    "RasterRelayColorMatch": "RasterRelay Color Match (biblioteka)",
+    "RasterRelayEdgeHarmonize": "RasterRelay Edge Harmonize (biblioteka)",
+    "RasterRelayAreaMatch": "RasterRelay Area Match (biblioteka)",
+    "RasterRelayMaskCropper": "RasterRelay Mask Cropper (biblioteka)",
     "RasterRelayBackgroundPreserve": "RasterRelay Background Preserve",
     "RasterRelaySeamlessTone": "RasterRelay Seamless Tone",
     "RasterRelayMaskEdgeRefine": "RasterRelay Mask Edge Refine",

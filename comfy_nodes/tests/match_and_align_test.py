@@ -12,12 +12,11 @@ def load_match_and_align():
         module.RasterRelaySmartCropAligner,
         module.RasterRelaySmartCropTrimmer,
         module.RasterRelayVaeDriftMatch,
-        module.RasterRelayGrainInjector,
     )
 
 
 def test_smart_crop_aligner_and_trimmer():
-    AlignerClass, TrimmerClass, _, _ = load_match_and_align()
+    AlignerClass, TrimmerClass, _ = load_match_and_align()
     aligner = AlignerClass()
     trimmer = TrimmerClass()
 
@@ -66,7 +65,7 @@ def test_smart_crop_aligner_and_trimmer():
 
 
 def test_smart_crop_boundary_handling():
-    AlignerClass, _, _, _ = load_match_and_align()
+    AlignerClass, _, _ = load_match_and_align()
     aligner = AlignerClass()
 
     doc_image = torch.ones((1, 500, 500, 3), dtype=torch.float32)
@@ -96,7 +95,7 @@ def test_smart_crop_boundary_handling():
 
 
 def test_vae_drift_match():
-    _, _, DriftMatchClass, _ = load_match_and_align()
+    _, _, DriftMatchClass = load_match_and_align()
     drift_matcher = DriftMatchClass()
 
     original_crop = torch.zeros((1, 100, 100, 3), dtype=torch.float32)
@@ -127,7 +126,7 @@ def test_vae_drift_match():
 
 
 def test_vae_drift_match_keeps_unmasked_exact_with_blend():
-    _, _, DriftMatchClass, _ = load_match_and_align()
+    _, _, DriftMatchClass = load_match_and_align()
     drift_matcher = DriftMatchClass()
 
     original_crop = torch.rand((1, 80, 80, 3), dtype=torch.float32)
@@ -148,7 +147,7 @@ def test_vae_drift_match_keeps_unmasked_exact_with_blend():
 
 
 def test_vae_drift_match_binary_mode_avoids_double_soft_masking():
-    _, _, DriftMatchClass, _ = load_match_and_align()
+    _, _, DriftMatchClass = load_match_and_align()
     drift_matcher = DriftMatchClass()
 
     original_crop = torch.zeros((1, 8, 8, 3), dtype=torch.float32)
@@ -169,7 +168,7 @@ def test_vae_drift_match_binary_mode_avoids_double_soft_masking():
 
 
 def test_vae_drift_match_resizes_generated_crop_to_original_geometry():
-    _, _, DriftMatchClass, _ = load_match_and_align()
+    _, _, DriftMatchClass = load_match_and_align()
     drift_matcher = DriftMatchClass()
 
     original_crop = torch.full((1, 1338, 16, 3), 0.5, dtype=torch.float32)
@@ -191,7 +190,7 @@ def test_vae_drift_match_resizes_generated_crop_to_original_geometry():
 
 
 def test_vae_drift_match_soft_mode_keeps_legacy_preblend():
-    _, _, DriftMatchClass, _ = load_match_and_align()
+    _, _, DriftMatchClass = load_match_and_align()
     drift_matcher = DriftMatchClass()
 
     original_crop = torch.zeros((1, 8, 8, 3), dtype=torch.float32)
@@ -210,33 +209,6 @@ def test_vae_drift_match_soft_mode_keeps_legacy_preblend():
 
     assert torch.allclose(matched[:, 2:6, 2:6, :], torch.tensor(0.25))
     assert torch.allclose(matched[:, :2, :, :], torch.tensor(0.0))
-
-
-def test_grain_injector():
-    _, _, _, GrainClass = load_match_and_align()
-    injector = GrainClass()
-
-    original_crop = torch.rand((1, 50, 50, 3), dtype=torch.float32)
-    generated_crop = torch.ones((1, 50, 50, 3), dtype=torch.float32) * 0.5
-    mask = torch.zeros((1, 50, 50), dtype=torch.float32)
-    mask[:, 10:40, 10:40] = 1.0
-
-    (grained,) = injector.inject_grain(
-        original_crop=original_crop,
-        generated_crop=generated_crop,
-        mask=mask,
-        grain_strength=1.0,
-    )
-
-    assert grained.shape == (1, 50, 50, 3)
-    # Areas where mask = 0 should have exactly 0.5 (no grain added to unedited regions)
-    assert torch.all(grained[:, :10, :10, :] == 0.5)
-    # Areas where mask = 1 should have some variance added (grain injected)
-    assert not torch.all(grained[:, 10:40, 10:40, :] == 0.5)
-
-    edited_delta = grained[:, 10:40, 10:40, :] - generated_crop[:, 10:40, 10:40, :]
-    assert torch.allclose(edited_delta[..., 0], edited_delta[..., 1])
-    assert torch.allclose(edited_delta[..., 1], edited_delta[..., 2])
 
 
 if __name__ == "__main__":
