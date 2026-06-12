@@ -1,5 +1,7 @@
 (() => {
 const COMFYUI_BASE_URL = "http://127.0.0.1:8188";
+const COMFYUI_WS_URL = "ws://127.0.0.1:8188/ws";
+const COMFY_CLIENT_ID = "rasterrelay-photoshop";
 const COMFYUI_SYSTEM_STATS_URL = `${COMFYUI_BASE_URL}/system_stats`;
 const JOB_FILE_NAME = "rasterrelay-inpainting-job.json";
 const QUALITY_SETTINGS_FILE_NAME = "rasterrelay-quality-settings.json";
@@ -34,22 +36,17 @@ const defaultQualitySettings = panelHelpers.normalizeQualitySettings
       negativePrompt:
         "hard square edges, visible seams, distorted hands, extra fingers, unreadable artifacts, duplicated object, damaged background"
     };
+function buildQualityPreset(name, label) {
+  const plan = panelHelpers.resolveQualityPlan
+    ? panelHelpers.resolveQualityPlan(name)
+    : { name, steps: 14, refine: false, refineSourceNodeId: "93" };
+  return { label, cfg: 1, ...plan };
+}
+
 const qualityPresets = {
-  fast: {
-    label: "Szybki test",
-    steps: 8,
-    cfg: 1
-  },
-  balanced: {
-    label: "Dobra jakość",
-    steps: 14,
-    cfg: 1
-  },
-  quality: {
-    label: "Dokładna edycja",
-    steps: 20,
-    cfg: 1
-  }
+  fast: buildQualityPreset("fast", "Szybki (bez refine)"),
+  balanced: buildQualityPreset("balanced", "Dobra jakość"),
+  quality: buildQualityPreset("quality", "Maks (refine)")
 };
 
 let ui = null;
@@ -75,13 +72,23 @@ const panelMarkup = `
       <label for="promptInput">Prompt</label>
       <textarea id="promptInput" rows="5" placeholder="Napisz, co ma się pojawić w zaznaczonym miejscu."></textarea>
 
-      <p class="hint">Reszta ustawień będzie w Launcherze, żeby panel Photoshopa został lekki.</p>
+      <label for="qualitySelectVisible">Jakość</label>
+      <select id="qualitySelectVisible">
+        <option value="fast">Szybki — bez refine, najszybszy</option>
+        <option value="balanced" selected>Dobra jakość — zalecane</option>
+        <option value="quality">Maks — refine, najgładszy szew</option>
+      </select>
     </section>
 
     <section class="action-section" aria-label="Funkcja RasterRelay">
       <button class="primary" id="prepareButton">Przygotuj edycje</button>
       <button class="dev-only" id="e2eSmokeButton">Test E2E</button>
       <button id="documentButton">Sprawdź dokument</button>
+    </section>
+
+    <section class="progress-card" id="progressCard" aria-live="polite" hidden>
+      <div class="rr-progress-track"><div class="rr-progress-bar" id="progressBar"></div></div>
+      <span id="progressLabel" class="rr-progress-label"></span>
     </section>
 
     <section class="log-card" aria-live="polite">
@@ -126,6 +133,10 @@ function collectUi(rootNode) {
     prepareButton: findPanelElement(rootNode, "prepareButton"),
     promptInput: findPanelElement(rootNode, "promptInput"),
     qualitySelect: findPanelElement(rootNode, "qualitySelect"),
+    qualitySelectVisible: findPanelElement(rootNode, "qualitySelectVisible"),
+    progressCard: findPanelElement(rootNode, "progressCard"),
+    progressBar: findPanelElement(rootNode, "progressBar"),
+    progressLabel: findPanelElement(rootNode, "progressLabel"),
     readinessButton: findPanelElement(rootNode, "readinessButton")
   };
 }
@@ -172,6 +183,94 @@ function setComfyStatus(isReady, message) {
 
   ui.comfyDot.classList.toggle("ready", isReady);
   ui.comfyStatus.textContent = message;
+}
+
+function setProgress(fraction, label) {
+  if (!ui?.progressCard) {
+    return;
+  }
+  if (fraction === null) {
+    ui.progressCard.hidden = true;
+    return;
+  }
+  ui.progressCard.hidden = false;
+  const pct = Math.max(0, Math.min(100, Math.round(fraction * 100)));
+  if (ui.progressBar) {
+    ui.progressBar.style.width = `${pct}%`;
+    ui.progressBar.classList.toggle("indeterminate", fraction === undefined);
+  }
+  if (ui.progressLabel) {
+    ui.progressLabel.textContent = label || (fraction === undefined ? "Pracuję..." : `${pct}%`);
+  }
+}
+
+// Live progress from ComfyUI over WebSocket. Display-only and best-effort: the
+// authoritative completion still comes from history polling, so a WS failure
+// never blocks a generation. Schema confirmed via ComfyUI docs:
+// {type, data} with types progress(value,max), executing(node), execution_*.
+function subscribeComfyProgress(promptId, onUpdate) {
+  let socket = null;
+  try {
+    socket = new WebSocket(`${COMFYUI_WS_URL}?clientId=${COMFY_CLIENT_ID}`);
+  } catch {
+    return () => {};
+  }
+  socket.onmessage = (event) => {
+    if (typeof event.data !== "string") {
+      return; // binary preview frames
+    }
+    let msg;
+    try {
+      msg = JSON.parse(event.data);
+    } catch {
+      return;
+    }
+    const data = msg?.data || {};
+    if (data.prompt_id && promptId && data.prompt_id !== promptId) {
+      return;
+    }
+    if (msg.type === "progress" && data.max) {
+      onUpdate({ fraction: data.value / data.max, label: `Generuję… ${data.value}/${data.max}` });
+    } else if (msg.type === "executing") {
+      if (data.node === null) {
+        onUpdate({ fraction: undefined, label: "Składam wynik…" });
+      } else {
+        onUpdate({ fraction: undefined, label: "Przetwarzam…" });
+      }
+    }
+  };
+  socket.onerror = () => {};
+  return () => {
+    try {
+      socket?.close();
+    } catch {
+      /* ignore */
+    }
+  };
+}
+
+// Turn a raw failure into a clear, actionable Polish message.
+function describeComfyError(error) {
+  const raw = String(error?.message || error || "");
+  const lower = raw.toLowerCase();
+  if (
+    lower.includes("failed to fetch") ||
+    lower.includes("networkerror") ||
+    lower.includes("err_connection") ||
+    lower.includes("econnrefused")
+  ) {
+    return "ComfyUI nie odpowiada (http://127.0.0.1:8188). Uruchom je w Launcherze przyciskiem „Start ComfyUI” i sprawdź połączenie.";
+  }
+  if (lower.includes("nieaktualne albo niezgodne custom nodes") || lower.includes("brakuje wejsc")) {
+    return `${raw}`;
+  }
+  if (lower.includes("out of memory") || lower.includes("cuda") || lower.includes("oom") || lower.includes("alloc")) {
+    return "Zabrakło pamięci GPU (VRAM). Zmniejsz zaznaczenie albo użyj presetu „Szybki”. Szczegóły: " + raw;
+  }
+  if (lower.includes("odrzucilo workflow") || lower.includes("node_errors")) {
+    return "ComfyUI odrzuciło workflow — najczęściej brak modelu lub węzła. Przeinstaluj RasterRelay nodes i sprawdź modele. Szczegóły: " + raw;
+  }
+  return raw || "Nieznany błąd.";
 }
 
 async function checkComfyUi() {
@@ -320,7 +419,8 @@ function getPrompt() {
 }
 
 function getQualityPreset() {
-  return qualityPresets[ui.qualitySelect.value] || qualityPresets.balanced;
+  const value = ui?.qualitySelectVisible?.value || ui?.qualitySelect?.value;
+  return qualityPresets[value] || qualityPresets.balanced;
 }
 
 function getQualityPresetForSettings(settings) {
@@ -1510,6 +1610,14 @@ function applyWorkflowInputs(workflow, mapping, job, comfyUploads) {
   setWorkflowInput(workflow, mapping.inputs.negativePrompt, job.generation.negativePrompt || "");
   setWorkflowInput(workflow, mapping.inputs.steps, job.generation.quality?.steps);
   setWorkflowInput(workflow, mapping.inputs.cfg, job.generation.quality?.cfg);
+
+  // Quality preset -> refine pass on/off. Switch SeamlessTone's source between
+  // the refined branch (node 89) and the base result (node 93); ComfyUI prunes
+  // the refine branch when unused, so Fast/Balanced run noticeably faster.
+  if (mapping.inputs.refineSource) {
+    const refineNodeId = job.generation.quality?.refineSourceNodeId || "93";
+    setWorkflowInput(workflow, mapping.inputs.refineSource, [refineNodeId, 0]);
+  }
   setWorkflowInput(workflow, mapping.inputs.seed, job.generation.activeSeed);
   setWorkflowInput(workflow, mapping.inputs.seedRandomize, "disable");
 
@@ -1584,7 +1692,7 @@ async function queueComfyWorkflow(job, comfyUploads) {
       "Content-Type": "application/json"
     },
     body: JSON.stringify({
-      client_id: "rasterrelay-photoshop",
+      client_id: COMFY_CLIENT_ID,
       prompt: workflow
     })
   });
@@ -1680,28 +1788,37 @@ async function getComfyHistory(promptId) {
 
 async function waitForComfyOutput(promptId) {
   const startedAt = Date.now();
+  const closeProgress = subscribeComfyProgress(promptId, (update) => {
+    setProgress(update.fraction, update.label);
+  });
+  setProgress(undefined, "Wysłano do ComfyUI…");
 
-  while (Date.now() - startedAt < COMFY_HISTORY_TIMEOUT_MS) {
-    const history = await getComfyHistory(promptId);
-    const entry = history[promptId];
-    const outputImage = findFirstOutputImage(entry);
+  try {
+    while (Date.now() - startedAt < COMFY_HISTORY_TIMEOUT_MS) {
+      const history = await getComfyHistory(promptId);
+      const entry = history[promptId];
+      const outputImage = findFirstOutputImage(entry);
 
-    if (outputImage) {
-      return {
-        history: entry,
-        image: outputImage
-      };
+      if (outputImage) {
+        setProgress(1, "Gotowe — pobieram wynik…");
+        return {
+          history: entry,
+          image: outputImage
+        };
+      }
+
+      const status = entry?.status?.status_str;
+      if (status === "error" || status === "failed") {
+        throw new Error(`ComfyUI zakonczyl workflow bledem: ${summarizeComfyHistoryFailure(entry)}`);
+      }
+
+      await wait(COMFY_HISTORY_POLL_MS);
     }
 
-    const status = entry?.status?.status_str;
-    if (status === "error" || status === "failed") {
-      throw new Error(`ComfyUI zakonczyl workflow bledem: ${summarizeComfyHistoryFailure(entry)}`);
-    }
-
-    await wait(COMFY_HISTORY_POLL_MS);
+    throw new Error("ComfyUI nie zwróciło obrazu w wyznaczonym czasie.");
+  } finally {
+    closeProgress();
   }
-
-  throw new Error("ComfyUI nie zwróciło obrazu w wyznaczonym czasie.");
 }
 
 async function downloadComfyImage(image, dataFolder) {
@@ -2520,8 +2637,10 @@ async function prepareInpaintingEdit() {
         : `Wyniki ComfyUI pobrane do plików, ale nie udało się wstawić warstw automatycznie: ${resultAsset?.photoshop?.error}`
     );
   } catch (error) {
-    setMessage(`Nie udało się przygotować edycji: ${error.message || error}`);
+    setProgress(null);
+    setMessage(`Nie udało się przygotować edycji: ${describeComfyError(error)}`);
   } finally {
+    setProgress(null);
     ui.prepareButton.disabled = false;
   }
 }
@@ -2620,6 +2739,17 @@ function initializePanel(rootNode) {
   ui.prepareButton.addEventListener("click", () => {
     void runInpaintingEdit();
   });
+
+  // keep the legacy hidden quality select in sync with the visible one
+  if (ui.qualitySelectVisible) {
+    ui.qualitySelectVisible.addEventListener("change", () => {
+      if (ui.qualitySelect) {
+        ui.qualitySelect.value = ui.qualitySelectVisible.value;
+      }
+      const preset = getQualityPreset();
+      setMessage(`Jakość: ${preset.label} (${preset.steps} kroków${preset.refine ? ", refine" : ""}).`);
+    });
+  }
 
   if (ui.e2eSmokeButton) {
     ui.e2eSmokeButton.addEventListener("click", () => {

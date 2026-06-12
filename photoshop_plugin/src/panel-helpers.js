@@ -316,6 +316,27 @@
     return generationMaskHaloPxByQuality[quality] || generationMaskHaloPxByQuality.balanced;
   }
 
+  // Single source of truth for quality presets. `refine` toggles the Phase-B
+  // refine pass: when off, the workflow's SeamlessTone reads the base result
+  // (node 93) and ComfyUI prunes the whole refine branch (faster); when on it
+  // reads the refined result (node 89, smoothest internal blend).
+  const qualityPlans = {
+    fast: { steps: 8, refine: false },
+    balanced: { steps: 14, refine: false },
+    quality: { steps: 20, refine: true }
+  };
+
+  function resolveQualityPlan(quality) {
+    const name = qualityPlans[quality] ? quality : "balanced";
+    const plan = qualityPlans[name];
+    return {
+      name,
+      steps: plan.steps,
+      refine: plan.refine,
+      refineSourceNodeId: plan.refine ? "89" : "93"
+    };
+  }
+
   function getVisibilityMaskOptions(settings = {}) {
     const normalized = normalizeQualitySettings(settings);
     return {
@@ -435,6 +456,7 @@
     hasSoftEdge,
     insertDynamicLoraChain,
     normalizeQualitySettings,
+    resolveQualityPlan,
     parseLoraItems,
     parseLoraToken,
     setWorkflowInput,

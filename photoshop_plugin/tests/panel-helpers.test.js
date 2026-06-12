@@ -339,3 +339,25 @@ test("computeOptimalGenSize output is multiple of 16", () => {
   assert.equal(r.genHeight % 16, 0);
   assert.ok(r.scale < 1.0 && r.scale >= 0.5);
 });
+
+test("resolveQualityPlan maps presets to steps + refine source", () => {
+  const fast = helpers.resolveQualityPlan("fast");
+  assert.equal(fast.steps, 8);
+  assert.equal(fast.refine, false);
+  assert.equal(fast.refineSourceNodeId, "93");
+
+  const balanced = helpers.resolveQualityPlan("balanced");
+  assert.equal(balanced.refine, false);
+  assert.equal(balanced.refineSourceNodeId, "93");
+
+  const quality = helpers.resolveQualityPlan("quality");
+  assert.equal(quality.steps, 20);
+  assert.equal(quality.refine, true);
+  assert.equal(quality.refineSourceNodeId, "89");
+});
+
+test("resolveQualityPlan falls back to balanced for unknown names", () => {
+  const r = helpers.resolveQualityPlan("nonsense");
+  assert.equal(r.name, "balanced");
+  assert.equal(r.refineSourceNodeId, "93");
+});

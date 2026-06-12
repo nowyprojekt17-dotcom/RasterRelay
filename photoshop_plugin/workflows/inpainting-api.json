@@ -314,11 +314,30 @@
       "change_keep_threshold": 0.1
     }
   },
+  "93": {
+    "class_type": "RasterRelayColorCalibrate",
+    "inputs": {
+      "original_image": [
+        "10",
+        0
+      ],
+      "generated_image": [
+        "95",
+        0
+      ],
+      "mask": [
+        "13",
+        0
+      ],
+      "drift_threshold": 0.1,
+      "strength": 1.0
+    }
+  },
   "17": {
     "class_type": "ImageScale",
     "inputs": {
       "image": [
-        "95",
+        "93",
         0
       ],
       "upscale_method": "lanczos",
@@ -408,25 +427,6 @@
       "crop": "disabled"
     }
   },
-  "93": {
-    "class_type": "RasterRelayColorCalibrate",
-    "inputs": {
-      "original_image": [
-        "10",
-        0
-      ],
-      "generated_image": [
-        "18",
-        0
-      ],
-      "mask": [
-        "13",
-        0
-      ],
-      "drift_threshold": 0.1,
-      "strength": 1.0
-    }
-  },
   "88": {
     "class_type": "RasterRelayVaeDriftMatch",
     "inputs": {
@@ -435,7 +435,7 @@
         0
       ],
       "generated_crop": [
-        "93",
+        "18",
         0
       ],
       "mask": [
@@ -476,7 +476,7 @@
         0
       ],
       "generated_image": [
-        "89",
+        "93",
         0
       ],
       "mask": [

@@ -7,6 +7,18 @@ a ten projekt adheres to [Semantic Versioning](https://semver.org/lang/pl/).
 
 ## [Unreleased]
 
+### Added (Tier 1 — UX/wydajność)
+- **Presety jakości w panelu (widoczny selektor):** Szybki (8 kroków, bez
+  refine), Dobra jakość (14, bez refine, domyślny), Maks (20, z refine).
+  Preset przełącza źródło `SeamlessTone` między bazą (węzeł 93) a wynikiem
+  refine (węzeł 89) przez klucz mappingu `refineSource`; ComfyUI przycina
+  gałąź refine gdy nieużywana → Szybki/Zbalansowany ~33% szybsze (zmierzone:
+  24 s vs 36 s). ColorCalibrate odsprzęgnięty od refine — działa zawsze.
+- **Pasek postępu generacji** przez WebSocket ComfyUI (`/ws`,
+  progress/executing); best-effort, polling pozostaje źródłem ukończenia.
+- **Czytelne błędy:** klasyfikacja (ComfyUI offline / brak modelu-węzłów /
+  OOM VRAM) z konkretną podpowiedzią naprawy w panelu.
+
 ### Added (Faza D — guard-rail rozdzielczości generacji)
 - `computeOptimalGenSize` w panel-helpers + węzły skalowania w workflow:
   wycinki ≤ ~1.15 MP generują NATYWNIE (zmierzono: upscale małych wycinków
