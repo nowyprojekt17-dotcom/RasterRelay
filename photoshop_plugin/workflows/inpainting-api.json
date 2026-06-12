@@ -253,6 +253,27 @@
       "mask_mode": "soft"
     }
   },
+  "95": {
+    "class_type": "RasterRelayBackgroundPreserve",
+    "inputs": {
+      "original_image": [
+        "10",
+        0
+      ],
+      "generated_image": [
+        "94",
+        0
+      ],
+      "mask": [
+        "13",
+        0
+      ],
+      "object_luma_max": 0.58,
+      "red_keep_threshold": 0.08,
+      "blend_radius": 16,
+      "change_keep_threshold": 0.1
+    }
+  },
   "96": {
     "class_type": "RasterRelaySeamlessTone",
     "inputs": {
@@ -261,7 +282,7 @@
         0
       ],
       "generated_image": [
-        "94",
+        "95",
         0
       ],
       "mask": [

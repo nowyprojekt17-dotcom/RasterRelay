@@ -105,6 +105,10 @@
     "maskRefineStrength": {
       "nodeId": "13",
       "inputName": "strength"
+    },
+    "backgroundPreserveThreshold": {
+      "nodeId": "95",
+      "inputName": "change_keep_threshold"
     }
   },
   "notes": {

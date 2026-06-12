@@ -26,9 +26,13 @@ wf = {
  # the original object's edges must NOT pull the mask (ghost contours).
  "13": {"class_type": "RasterRelayMaskEdgeRefine", "inputs": {"image": ["65", 0], "mask": ["11", 0], "radius": 8, "edge_sensitivity": 0.02, "strength": 1.0}},
  "94": {"class_type": "RasterRelayVaeDriftMatch", "inputs": {"original_crop": ["10", 0], "generated_crop": ["65", 0], "mask": ["13", 0], "blend_radius": 16, "restore_unmasked": True, "mask_mode": "soft"}},
+ # inside the mask: restore original where the model changed little (unintended
+ # tone drift on background/skin -> mask-shaped stains); keep where it changed
+ # a lot (the intended edit). Measured bimodal split: drift <0.05, intent >0.15.
+ "95": {"class_type": "RasterRelayBackgroundPreserve", "inputs": {"original_image": ["10", 0], "generated_image": ["94", 0], "mask": ["13", 0], "object_luma_max": 0.58, "red_keep_threshold": 0.08, "blend_radius": 16, "change_keep_threshold": 0.10}},
  # intent-preserving: full correction only in the seam band; deep interior
  # keeps the model's intentional edit (recolours, removals, new objects)
- "96": {"class_type": "RasterRelaySeamlessTone", "inputs": {"original_image": ["10", 0], "generated_image": ["94", 0], "mask": ["13", 0], "tone_radius": 40, "strength": 1.0, "mode": "full", "interior_strength": 0.15, "seam_band": 24}},
+ "96": {"class_type": "RasterRelaySeamlessTone", "inputs": {"original_image": ["10", 0], "generated_image": ["95", 0], "mask": ["13", 0], "tone_radius": 40, "strength": 1.0, "mode": "full", "interior_strength": 0.15, "seam_band": 24}},
  # Phase C: large-radius chroma-only pass kills residual colour cast AT THE SEAM ONLY
  "97": {"class_type": "RasterRelaySeamlessTone", "inputs": {"original_image": ["10", 0], "generated_image": ["96", 0], "mask": ["13", 0], "tone_radius": 120, "strength": 0.85, "mode": "chroma", "interior_strength": 0.0, "seam_band": 24}},
  # Phase C: photographic grain continuity (residual clamped so removed objects leave no ghost contours)
@@ -64,6 +68,7 @@ mapping = {
   "chromaStrength": {"nodeId": "97", "inputName": "strength"},
   "grainStrength": {"nodeId": "98", "inputName": "grain_strength"},
   "maskRefineStrength": {"nodeId": "13", "inputName": "strength"},
+  "backgroundPreserveThreshold": {"nodeId": "95", "inputName": "change_keep_threshold"},
  },
  "notes": {
   "baseModel": "flux-2-klein-9b-Q4_K_M.gguf",
