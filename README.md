@@ -4,6 +4,9 @@ RasterRelay to projekt narzędzia do Photoshopa, które ma łączyć pracę z ob
 
 Docelowa wersja Photoshopa dla tego projektu to **Photoshop Beta 27.8**.
 
+> 📖 **Jak używać wtyczki krok po kroku:** [`docs/uzytkowanie.md`](docs/uzytkowanie.md)
+> (zaznaczenie → tryb → jakość → prompt → warstwa, presety, usuwanie, typowe problemy).
+
 Pierwsze etapy nie budują jeszcze całej wtyczki. Zaczynamy od małego Launchera, czyli aplikacji pomocniczej, która sprawdza lokalne środowisko ComfyUI i pomaga je przygotować.
 
 ## Co jest teraz najważniejsze
