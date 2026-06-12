@@ -7,6 +7,15 @@ a ten projekt adheres to [Semantic Versioning](https://semver.org/lang/pl/).
 
 ## [Unreleased]
 
+> 📋 Pełny narracyjny raport tej sesji (problem koloru, Fazy A–D, hotfixy,
+> Tier 1–3, metryki, lekcje): [`docs/raport-sesji-2026-06-12.md`](docs/raport-sesji-2026-06-12.md).
+
+### Added (Tier 3 — porządki i dokumentacja)
+- Usunięto duplikat węzła `RasterRelayGrainInjector` (18 → 17 węzłów); 8 węzłów
+  biblioteki oznaczonych `(biblioteka)` w nazwach menu ComfyUI.
+- Przepisany `comfy_nodes/README.md` (podział aktywne/biblioteka + kolejność).
+- Przewodnik użytkownika `docs/uzytkowanie.md` (linkowany z README).
+
 ### Added (Tier 2 — produkt/DX)
 - **Tryb „Usuwanie obiektu"** (selektor w panelu): poszerza maskę generacji
   o +20 px (obiekt znika bez obwódki) i obniża próg `BackgroundPreserve`
