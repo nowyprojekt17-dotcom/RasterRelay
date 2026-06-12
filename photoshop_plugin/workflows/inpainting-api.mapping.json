@@ -109,6 +109,18 @@
     "backgroundPreserveThreshold": {
       "nodeId": "95",
       "inputName": "change_keep_threshold"
+    },
+    "refineDenoise": {
+      "nodeId": "72",
+      "inputName": "denoise"
+    },
+    "refineSeed": {
+      "nodeId": "71",
+      "inputName": "noise_seed"
+    },
+    "calibrateStrength": {
+      "nodeId": "93",
+      "inputName": "strength"
     }
   },
   "notes": {
@@ -116,7 +128,8 @@
     "textEncoder": "qwen_3_8b_fp8mixed.safetensors",
     "vae": "flux2-vae.safetensors",
     "maskChannel": "LoadImageMask red channel. Plugin uploads the crop-local generation/denoise mask.",
-    "architecture": "DifferentialDiffusion + VAEDecode -> [MaskEdgeRefine guides compositing] -> VaeDriftMatch -> SeamlessTone(full, ~crop/8) -> SeamlessTone(chroma-only, ~crop/3) -> GrainTransfer -> PadToDocument -> SaveImage.",
+    "architecture": "gen(DD) -> VDM -> BgPreserve -> [REFINE: encode -> denoise 0.25 -> decode] -> ColorCalibrate -> VDM -> BgPreserve -> SeamlessTone(full, seam-band) -> SeamlessTone(chroma, seam-band) -> GrainTransfer -> PadToDocument.",
+    "phaseB": "Refine pass: short low-denoise (0.25) pass over the whole stage-1 composite unifies grain/sharpness/colour response and melts internal keep/restore boundaries. ColorCalibrate then measures the model's affine colour drift on should-be-unchanged pixels (the drift population) and inverts it on the whole result - removes the systematic cast from the INTENT region too, without reverting the semantic edit.",
     "phaseC": "MaskEdgeRefine (guided filter) snaps the compositing mask to real image edges (hair strands keep their silhouette, no halo). Chroma-only SeamlessTone pass at large radius removes residual colour cast without touching luminance. GrainTransfer restores photographic grain so the patch shares the original's texture character. Generation/denoise path still uses the raw plugin mask (node 11) - refinement applies to compositing only.",
     "differentialDiffusion": "Model patch: soft mask becomes a per-pixel denoise gradient, so the model itself blends tone/texture progressively at the boundary. Measured -18% dL_seam / -22% seam_step on the hair-recolor case; neutral on easy cases. InpaintModelConditioning was tested and is a no-op for Flux2 Klein GGUF (pixel-identical output) - intentionally not used.",
     "colorPipeline": "VaeDriftMatch hard-restores original pixels outside the selection (zero VAE drift there). SeamlessTone then diffuses the surrounding low-frequency colour/brightness INTO the masked region and shifts only the generated low frequency to match it, fixing exposure/colour offset AND lighting gradients while preserving generated detail. Replaces the old global-Reinhard AreaMatch+ColorHarmonize chain, which measurably worsened the seam.",

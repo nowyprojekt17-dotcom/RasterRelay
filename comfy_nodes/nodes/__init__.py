@@ -16,6 +16,7 @@ from .mask_cropper import RasterRelayMaskCropper
 from .background_preserve import RasterRelayBackgroundPreserve
 from .seamless_tone import RasterRelaySeamlessTone
 from .mask_edge_refine import RasterRelayMaskEdgeRefine
+from .color_calibrate import RasterRelayColorCalibrate
 
 __all__ = [
     "RasterRelaySelectionMask",
@@ -34,4 +35,5 @@ __all__ = [
     "RasterRelayBackgroundPreserve",
     "RasterRelaySeamlessTone",
     "RasterRelayMaskEdgeRefine",
+    "RasterRelayColorCalibrate",
 ]

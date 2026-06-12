@@ -30,9 +30,25 @@ wf = {
  # tone drift on background/skin -> mask-shaped stains); keep where it changed
  # a lot (the intended edit). Measured bimodal split: drift <0.05, intent >0.15.
  "95": {"class_type": "RasterRelayBackgroundPreserve", "inputs": {"original_image": ["10", 0], "generated_image": ["94", 0], "mask": ["13", 0], "object_luma_max": 0.58, "red_keep_threshold": 0.08, "blend_radius": 16, "change_keep_threshold": 0.10}},
+ # ---- Phase B: refine pass ----------------------------------------------
+ # Re-encode the stage-1 composite and run a short low-denoise pass over the
+ # WHOLE crop: unifies grain/sharpness/colour response and melts the
+ # keep/restore boundaries. DD patch is inert here (no noise mask).
+ "70": {"class_type": "VAEEncode", "inputs": {"pixels": ["95", 0], "vae": ["40", 0]}},
+ "71": {"class_type": "RandomNoise", "inputs": {"noise_seed": 1, "randomize_seed": "disable"}},
+ "72": {"class_type": "SplitSigmasDenoise", "inputs": {"sigmas": ["62", 0], "denoise": 0.18}},
+ "73": {"class_type": "SamplerCustomAdvanced", "inputs": {"noise": ["71", 0], "guider": ["63", 0], "sampler": ["61", 0], "sigmas": ["72", 1], "latent_image": ["70", 0]}},
+ "74": {"class_type": "VAEDecode", "inputs": {"samples": ["73", 0], "vae": ["40", 0]}},
+ # ---- colour-response calibration (intent-safe cast removal) -------------
+ # Fit the model's affine colour drift on should-be-unchanged pixels and
+ # invert it on the whole refined result (cannot revert semantic edits).
+ "93": {"class_type": "RasterRelayColorCalibrate", "inputs": {"original_image": ["10", 0], "generated_image": ["74", 0], "mask": ["13", 0], "drift_threshold": 0.10, "strength": 1.0}},
+ # stage-2 restore after the refine pass touched everything
+ "88": {"class_type": "RasterRelayVaeDriftMatch", "inputs": {"original_crop": ["10", 0], "generated_crop": ["93", 0], "mask": ["13", 0], "blend_radius": 16, "restore_unmasked": True, "mask_mode": "soft"}},
+ "89": {"class_type": "RasterRelayBackgroundPreserve", "inputs": {"original_image": ["10", 0], "generated_image": ["88", 0], "mask": ["13", 0], "object_luma_max": 0.58, "red_keep_threshold": 0.08, "blend_radius": 16, "change_keep_threshold": 0.10}},
  # intent-preserving: full correction only in the seam band; deep interior
  # keeps the model's intentional edit (recolours, removals, new objects)
- "96": {"class_type": "RasterRelaySeamlessTone", "inputs": {"original_image": ["10", 0], "generated_image": ["95", 0], "mask": ["13", 0], "tone_radius": 40, "strength": 1.0, "mode": "full", "interior_strength": 0.15, "seam_band": 24}},
+ "96": {"class_type": "RasterRelaySeamlessTone", "inputs": {"original_image": ["10", 0], "generated_image": ["89", 0], "mask": ["13", 0], "tone_radius": 40, "strength": 1.0, "mode": "full", "interior_strength": 0.15, "seam_band": 24}},
  # Phase C: large-radius chroma-only pass kills residual colour cast AT THE SEAM ONLY
  "97": {"class_type": "RasterRelaySeamlessTone", "inputs": {"original_image": ["10", 0], "generated_image": ["96", 0], "mask": ["13", 0], "tone_radius": 120, "strength": 0.85, "mode": "chroma", "interior_strength": 0.0, "seam_band": 24}},
  # Phase C: photographic grain continuity (residual clamped so removed objects leave no ghost contours)
@@ -69,13 +85,17 @@ mapping = {
   "grainStrength": {"nodeId": "98", "inputName": "grain_strength"},
   "maskRefineStrength": {"nodeId": "13", "inputName": "strength"},
   "backgroundPreserveThreshold": {"nodeId": "95", "inputName": "change_keep_threshold"},
+  "refineDenoise": {"nodeId": "72", "inputName": "denoise"},
+  "refineSeed": {"nodeId": "71", "inputName": "noise_seed"},
+  "calibrateStrength": {"nodeId": "93", "inputName": "strength"},
  },
  "notes": {
   "baseModel": "flux-2-klein-9b-Q4_K_M.gguf",
   "textEncoder": "qwen_3_8b_fp8mixed.safetensors",
   "vae": "flux2-vae.safetensors",
   "maskChannel": "LoadImageMask red channel. Plugin uploads the crop-local generation/denoise mask.",
-  "architecture": "DifferentialDiffusion + VAEDecode -> [MaskEdgeRefine guides compositing] -> VaeDriftMatch -> SeamlessTone(full, ~crop/8) -> SeamlessTone(chroma-only, ~crop/3) -> GrainTransfer -> PadToDocument -> SaveImage.",
+  "architecture": "gen(DD) -> VDM -> BgPreserve -> [REFINE: encode -> denoise 0.25 -> decode] -> ColorCalibrate -> VDM -> BgPreserve -> SeamlessTone(full, seam-band) -> SeamlessTone(chroma, seam-band) -> GrainTransfer -> PadToDocument.",
+  "phaseB": "Refine pass: short low-denoise (0.25) pass over the whole stage-1 composite unifies grain/sharpness/colour response and melts internal keep/restore boundaries. ColorCalibrate then measures the model's affine colour drift on should-be-unchanged pixels (the drift population) and inverts it on the whole result - removes the systematic cast from the INTENT region too, without reverting the semantic edit.",
   "phaseC": "MaskEdgeRefine (guided filter) snaps the compositing mask to real image edges (hair strands keep their silhouette, no halo). Chroma-only SeamlessTone pass at large radius removes residual colour cast without touching luminance. GrainTransfer restores photographic grain so the patch shares the original's texture character. Generation/denoise path still uses the raw plugin mask (node 11) - refinement applies to compositing only.",
   "differentialDiffusion": "Model patch: soft mask becomes a per-pixel denoise gradient, so the model itself blends tone/texture progressively at the boundary. Measured -18% dL_seam / -22% seam_step on the hair-recolor case; neutral on easy cases. InpaintModelConditioning was tested and is a no-op for Flux2 Klein GGUF (pixel-identical output) - intentionally not used.",
   "colorPipeline": "VaeDriftMatch hard-restores original pixels outside the selection (zero VAE drift there). SeamlessTone then diffuses the surrounding low-frequency colour/brightness INTO the masked region and shifts only the generated low frequency to match it, fixing exposure/colour offset AND lighting gradients while preserving generated detail. Replaces the old global-Reinhard AreaMatch+ColorHarmonize chain, which measurably worsened the seam.",

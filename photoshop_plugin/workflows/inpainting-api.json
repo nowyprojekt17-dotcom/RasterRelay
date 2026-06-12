@@ -274,6 +274,134 @@
       "change_keep_threshold": 0.1
     }
   },
+  "70": {
+    "class_type": "VAEEncode",
+    "inputs": {
+      "pixels": [
+        "95",
+        0
+      ],
+      "vae": [
+        "40",
+        0
+      ]
+    }
+  },
+  "71": {
+    "class_type": "RandomNoise",
+    "inputs": {
+      "noise_seed": 1,
+      "randomize_seed": "disable"
+    }
+  },
+  "72": {
+    "class_type": "SplitSigmasDenoise",
+    "inputs": {
+      "sigmas": [
+        "62",
+        0
+      ],
+      "denoise": 0.18
+    }
+  },
+  "73": {
+    "class_type": "SamplerCustomAdvanced",
+    "inputs": {
+      "noise": [
+        "71",
+        0
+      ],
+      "guider": [
+        "63",
+        0
+      ],
+      "sampler": [
+        "61",
+        0
+      ],
+      "sigmas": [
+        "72",
+        1
+      ],
+      "latent_image": [
+        "70",
+        0
+      ]
+    }
+  },
+  "74": {
+    "class_type": "VAEDecode",
+    "inputs": {
+      "samples": [
+        "73",
+        0
+      ],
+      "vae": [
+        "40",
+        0
+      ]
+    }
+  },
+  "93": {
+    "class_type": "RasterRelayColorCalibrate",
+    "inputs": {
+      "original_image": [
+        "10",
+        0
+      ],
+      "generated_image": [
+        "74",
+        0
+      ],
+      "mask": [
+        "13",
+        0
+      ],
+      "drift_threshold": 0.1,
+      "strength": 1.0
+    }
+  },
+  "88": {
+    "class_type": "RasterRelayVaeDriftMatch",
+    "inputs": {
+      "original_crop": [
+        "10",
+        0
+      ],
+      "generated_crop": [
+        "93",
+        0
+      ],
+      "mask": [
+        "13",
+        0
+      ],
+      "blend_radius": 16,
+      "restore_unmasked": true,
+      "mask_mode": "soft"
+    }
+  },
+  "89": {
+    "class_type": "RasterRelayBackgroundPreserve",
+    "inputs": {
+      "original_image": [
+        "10",
+        0
+      ],
+      "generated_image": [
+        "88",
+        0
+      ],
+      "mask": [
+        "13",
+        0
+      ],
+      "object_luma_max": 0.58,
+      "red_keep_threshold": 0.08,
+      "blend_radius": 16,
+      "change_keep_threshold": 0.1
+    }
+  },
   "96": {
     "class_type": "RasterRelaySeamlessTone",
     "inputs": {
@@ -282,7 +410,7 @@
         0
       ],
       "generated_image": [
-        "95",
+        "89",
         0
       ],
       "mask": [

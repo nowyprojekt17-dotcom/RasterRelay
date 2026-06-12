@@ -18,6 +18,7 @@ from .nodes.mask_cropper import RasterRelayMaskCropper
 from .nodes.background_preserve import RasterRelayBackgroundPreserve
 from .nodes.seamless_tone import RasterRelaySeamlessTone
 from .nodes.mask_edge_refine import RasterRelayMaskEdgeRefine
+from .nodes.color_calibrate import RasterRelayColorCalibrate
 
 NODE_CLASS_MAPPINGS = {
     "RasterRelaySelectionMask": RasterRelaySelectionMask,
@@ -37,6 +38,7 @@ NODE_CLASS_MAPPINGS = {
     "RasterRelayBackgroundPreserve": RasterRelayBackgroundPreserve,
     "RasterRelaySeamlessTone": RasterRelaySeamlessTone,
     "RasterRelayMaskEdgeRefine": RasterRelayMaskEdgeRefine,
+    "RasterRelayColorCalibrate": RasterRelayColorCalibrate,
 }
 
 NODE_DISPLAY_NAME_MAPPINGS = {
@@ -57,6 +59,7 @@ NODE_DISPLAY_NAME_MAPPINGS = {
     "RasterRelayBackgroundPreserve": "RasterRelay Background Preserve",
     "RasterRelaySeamlessTone": "RasterRelay Seamless Tone",
     "RasterRelayMaskEdgeRefine": "RasterRelay Mask Edge Refine",
+    "RasterRelayColorCalibrate": "RasterRelay Color Calibrate",
 }
 
 __all__ = ["NODE_CLASS_MAPPINGS", "NODE_DISPLAY_NAME_MAPPINGS"]

@@ -7,6 +7,20 @@ a ten projekt adheres to [Semantic Versioning](https://semver.org/lang/pl/).
 
 ## [Unreleased]
 
+### Added (Faza B + kalibracja odpowiedzi barwnej)
+- **Refine pass**: po złożeniu etapu 1 krótki przebieg niskim denoise (0.18)
+  po całym wycinku — ujednolica ziarno/ostrość/odpowiedź barwną i roztapia
+  wewnętrzne granice keep/restore. Sterowane mappingiem (`refineDenoise`,
+  `refineSeed`).
+- **Węzeł `RasterRelayColorCalibrate`** (pomysł użytkownika, ulepszony):
+  mierzy afiniczny dryf barwny modelu na pikselach, które miały zostać
+  niezmienione (populacja dryfu), i odwraca go na całym wyniku — zdejmuje
+  systematyczny cast także z obszaru INTENCJI, nie cofając zmiany
+  semantycznej (transformacja afiniczna nie odwróci brąz→zieleń).
+  Klucz mappingu `calibrateStrength`.
+- Łańcuch produkcyjny: gen(DD) → VDM → BgPreserve → [refine 0.18] →
+  ColorCalibrate → VDM → BgPreserve → SeamlessTone×2 → Grain → Pad.
+
 ### Fixed (hotfix po realnych testach: zielone włosy + usuwanie obiektów)
 - **SeamlessTone niszczył intencjonalne edycje**: pełna korekta tonu na całym
   wnętrzu maski ciągnęła np. zielone włosy do beżu otoczenia (+0.13 jasności,
