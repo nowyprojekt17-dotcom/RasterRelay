@@ -1527,8 +1527,14 @@ function applyWorkflowInputs(workflow, mapping, job, comfyUploads) {
   const genWidth = job.cropBounds?.width || job.document?.width;
   const genHeight = job.cropBounds?.height || job.document?.height;
   if (genWidth && genHeight) {
-    setWorkflowInput(workflow, mapping.inputs.width, Math.round(genWidth));
-    setWorkflowInput(workflow, mapping.inputs.height, Math.round(genHeight));
+    // Phase D crop-engine: generate at the model's optimal resolution
+    // (small crops upscaled = sharper detail, huge crops downscaled);
+    // the workflow scales the result back to the native crop size.
+    const optimal = panelHelpers.computeOptimalGenSize
+      ? panelHelpers.computeOptimalGenSize(genWidth, genHeight)
+      : { genWidth: Math.round(genWidth), genHeight: Math.round(genHeight) };
+    setWorkflowInput(workflow, mapping.inputs.width, optimal.genWidth);
+    setWorkflowInput(workflow, mapping.inputs.height, optimal.genHeight);
 
     // SeamlessTone: scale the tone-diffusion radius to the crop so colour/
     // brightness matching works on small and very large crops alike

@@ -68,6 +68,25 @@
     return Math.ceil(Math.max(1, Math.round(value || 1)) / normalizedMultiple) * normalizedMultiple;
   }
 
+  function computeOptimalGenSize(cropWidth, cropHeight, options = {}) {
+    // Phase D crop-engine (resolution guard-rail): crops at or below the
+    // model's comfortable area (~1.15 MP) generate at NATIVE size (measured:
+    // upscaling small crops gives no sharpness gain on Flux2 Klein and
+    // weakens the edit). Huge crops get a controlled DOWNSCALE for
+    // speed/VRAM and the model's trained resolution; the workflow scales
+    // the result back to the native crop.
+    const targetArea = options.targetArea || 1152 * 1024;
+    const minScale = options.minScale || 0.5;
+    const maxScale = options.maxScale || 1.0;
+    const multiple = options.multiple || 16;
+    const w = Math.max(1, Math.round(cropWidth));
+    const h = Math.max(1, Math.round(cropHeight));
+    const scale = Math.min(maxScale, Math.max(minScale, Math.sqrt(targetArea / (w * h))));
+    const genWidth = Math.max(multiple, Math.round((w * scale) / multiple) * multiple);
+    const genHeight = Math.max(multiple, Math.round((h * scale) / multiple) * multiple);
+    return { genWidth, genHeight, scale };
+  }
+
   function calculateGenerationBounds(cropBounds, docWidth, docHeight, multiple = 16) {
     const documentWidth = Math.max(1, Math.round(docWidth));
     const documentHeight = Math.max(1, Math.round(docHeight));
@@ -404,6 +423,7 @@
     calculatePaddedBounds,
     calculateGenerationBounds,
     clampNumber,
+    computeOptimalGenSize,
     defaultNegativePrompt,
     analyzeMask,
     buildFinalPrompt,

@@ -13,6 +13,14 @@ BASE = r"C:\Users\Mierz\Desktop\RasterRelay"
 
 prod = json.load(open(BASE + r"\photoshop_plugin\workflows\inpainting-api.json", encoding="utf-8"))
 
+def optimal_gen_size(w, h, target_area=1152 * 1024, min_scale=0.5, max_scale=1.0, multiple=16):
+    """Mirror of panel-helpers computeOptimalGenSize."""
+    scale = min(max_scale, max(min_scale, (target_area / (w * h)) ** 0.5))
+    gw = max(multiple, round((w * scale) / multiple) * multiple)
+    gh = max(multiple, round((h * scale) / multiple) * multiple)
+    return gw, gh
+
+
 def variant(src, msk, prompt, seed, W, H, prefix, extra_saves=True):
     wf = copy.deepcopy(prod)
     wf["10"]["inputs"]["image"] = src
@@ -20,7 +28,11 @@ def variant(src, msk, prompt, seed, W, H, prefix, extra_saves=True):
     wf["31"]["inputs"]["text"] = prompt
     wf["60"]["inputs"]["noise_seed"] = seed
     wf["60"]["inputs"]["randomize_seed"] = "disable"
-    for nid in ("21", "62"):
+    GW, GH = optimal_gen_size(W, H)
+    for nid in ("21", "62", "14", "15", "17"):     # generation resolution
+        wf[nid]["inputs"]["width"] = GW
+        wf[nid]["inputs"]["height"] = GH
+    for nid in ("16", "18"):                        # back to native crop
         wf[nid]["inputs"]["width"] = W
         wf[nid]["inputs"]["height"] = H
     for k, v in {"crop_left": 0, "crop_top": 0, "crop_width": W, "crop_height": H,
@@ -31,7 +43,8 @@ def variant(src, msk, prompt, seed, W, H, prefix, extra_saves=True):
     wf["80"]["inputs"]["filename_prefix"] = "RasterRelay/" + prefix
     if extra_saves:
         wf["82"] = {"class_type": "RasterRelaySaveImage",
-                    "inputs": {"images": ["65", 0], "filename_prefix": "RasterRelay/" + prefix + "raw"}}
+                    "inputs": {"images": ["16", 0], "filename_prefix": "RasterRelay/" + prefix + "raw"}}
+    print(f"  {prefix}: native {W}x{H} -> gen {GW}x{GH}")
     return wf
 
 # --- R1: build a necklace-removal mask on the blonde portrait source ---

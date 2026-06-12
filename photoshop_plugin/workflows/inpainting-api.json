@@ -88,11 +88,38 @@
       "vae_name": "flux2-vae.safetensors"
     }
   },
+  "14": {
+    "class_type": "ImageScale",
+    "inputs": {
+      "image": [
+        "10",
+        0
+      ],
+      "upscale_method": "lanczos",
+      "width": 1024,
+      "height": 1024,
+      "crop": "disabled"
+    }
+  },
+  "15": {
+    "class_type": "ResizeMask",
+    "inputs": {
+      "mask": [
+        "11",
+        0
+      ],
+      "width": 1024,
+      "height": 1024,
+      "keep_proportions": false,
+      "upscale_method": "bilinear",
+      "crop": "disabled"
+    }
+  },
   "41": {
     "class_type": "VAEEncode",
     "inputs": {
       "pixels": [
-        "10",
+        "14",
         0
       ],
       "vae": [
@@ -109,7 +136,7 @@
         0
       ],
       "mask": [
-        "11",
+        "15",
         0
       ]
     }
@@ -217,11 +244,24 @@
       ]
     }
   },
+  "16": {
+    "class_type": "ImageScale",
+    "inputs": {
+      "image": [
+        "65",
+        0
+      ],
+      "upscale_method": "lanczos",
+      "width": 1024,
+      "height": 768,
+      "crop": "disabled"
+    }
+  },
   "13": {
     "class_type": "RasterRelayMaskEdgeRefine",
     "inputs": {
       "image": [
-        "65",
+        "16",
         0
       ],
       "mask": [
@@ -241,7 +281,7 @@
         0
       ],
       "generated_crop": [
-        "65",
+        "16",
         0
       ],
       "mask": [
@@ -274,11 +314,24 @@
       "change_keep_threshold": 0.1
     }
   },
+  "17": {
+    "class_type": "ImageScale",
+    "inputs": {
+      "image": [
+        "95",
+        0
+      ],
+      "upscale_method": "lanczos",
+      "width": 1024,
+      "height": 1024,
+      "crop": "disabled"
+    }
+  },
   "70": {
     "class_type": "VAEEncode",
     "inputs": {
       "pixels": [
-        "95",
+        "17",
         0
       ],
       "vae": [
@@ -342,6 +395,19 @@
       ]
     }
   },
+  "18": {
+    "class_type": "ImageScale",
+    "inputs": {
+      "image": [
+        "74",
+        0
+      ],
+      "upscale_method": "lanczos",
+      "width": 1024,
+      "height": 768,
+      "crop": "disabled"
+    }
+  },
   "93": {
     "class_type": "RasterRelayColorCalibrate",
     "inputs": {
@@ -350,7 +416,7 @@
         0
       ],
       "generated_image": [
-        "74",
+        "18",
         0
       ],
       "mask": [

@@ -7,6 +7,15 @@ a ten projekt adheres to [Semantic Versioning](https://semver.org/lang/pl/).
 
 ## [Unreleased]
 
+### Added (Faza D — guard-rail rozdzielczości generacji)
+- `computeOptimalGenSize` w panel-helpers + węzły skalowania w workflow:
+  wycinki ≤ ~1.15 MP generują NATYWNIE (zmierzono: upscale małych wycinków
+  na Flux2 Klein nie daje ostrości, a osłabia edycję); wycinki większe są
+  kontrolowanie zmniejszane do ~1.15 MP (ochrona VRAM i jakości modelu),
+  a wynik wraca do natywnej rozdzielczości przed deterministycznym
+  post-processingiem. Test 2.79 MP: szew 0.0012 (rekord), zmiana poza
+  maską 0.00001.
+
 ### Added (Faza B + kalibracja odpowiedzi barwnej)
 - **Refine pass**: po złożeniu etapu 1 krótki przebieg niskim denoise (0.18)
   po całym wycinku — ujednolica ziarno/ostrość/odpowiedź barwną i roztapia

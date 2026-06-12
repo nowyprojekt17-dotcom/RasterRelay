@@ -11,8 +11,14 @@ wf = {
  "31": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["90", 1], "text": "RasterRelay inpainting"}},
  "32": {"class_type": "CLIPTextEncode", "inputs": {"clip": ["90", 1], "text": ""}},
  "40": {"class_type": "VAELoader", "inputs": {"vae_name": "flux2-vae.safetensors"}},
- "41": {"class_type": "VAEEncode", "inputs": {"pixels": ["10", 0], "vae": ["40", 0]}},
- "42": {"class_type": "SetLatentNoiseMask", "inputs": {"samples": ["41", 0], "mask": ["11", 0]}},
+ # ---- Phase D crop-engine: generate at the model's optimal resolution ----
+ # Plugin computes gen dims (~1.15MP, x16); source+mask are scaled UP/DOWN for
+ # generation and the decode is scaled back to the native crop, so the whole
+ # deterministic post-chain runs at native resolution against the original.
+ "14": {"class_type": "ImageScale", "inputs": {"image": ["10", 0], "upscale_method": "lanczos", "width": 1024, "height": 1024, "crop": "disabled"}},
+ "15": {"class_type": "ResizeMask", "inputs": {"mask": ["11", 0], "width": 1024, "height": 1024, "keep_proportions": False, "upscale_method": "bilinear", "crop": "disabled"}},
+ "41": {"class_type": "VAEEncode", "inputs": {"pixels": ["14", 0], "vae": ["40", 0]}},
+ "42": {"class_type": "SetLatentNoiseMask", "inputs": {"samples": ["41", 0], "mask": ["15", 0]}},
  "51": {"class_type": "ReferenceLatent", "inputs": {"conditioning": ["31", 0], "latent": ["41", 0]}},
  "52": {"class_type": "ReferenceLatent", "inputs": {"conditioning": ["32", 0], "latent": ["41", 0]}},
  "60": {"class_type": "RandomNoise", "inputs": {"noise_seed": 0, "randomize_seed": "enable"}},
@@ -21,11 +27,13 @@ wf = {
  "63": {"class_type": "CFGGuider", "inputs": {"model": ["22", 0], "positive": ["51", 0], "negative": ["52", 0], "cfg": 1}},
  "64": {"class_type": "SamplerCustomAdvanced", "inputs": {"noise": ["60", 0], "guider": ["63", 0], "sampler": ["61", 0], "sigmas": ["62", 0], "latent_image": ["42", 0]}},
  "65": {"class_type": "VAEDecode", "inputs": {"samples": ["64", 0], "vae": ["40", 0]}},
- # Phase C: edge-aware compositing mask. GUIDE = the GENERATED image (65), not
+ # decode back to the NATIVE crop size for the whole post-chain
+ "16": {"class_type": "ImageScale", "inputs": {"image": ["65", 0], "upscale_method": "lanczos", "width": 1024, "height": 768, "crop": "disabled"}},
+ # Phase C: edge-aware compositing mask. GUIDE = the GENERATED image (16), not
  # the original: for recolours the silhouette matches anyway, and for removals
  # the original object's edges must NOT pull the mask (ghost contours).
- "13": {"class_type": "RasterRelayMaskEdgeRefine", "inputs": {"image": ["65", 0], "mask": ["11", 0], "radius": 8, "edge_sensitivity": 0.02, "strength": 1.0}},
- "94": {"class_type": "RasterRelayVaeDriftMatch", "inputs": {"original_crop": ["10", 0], "generated_crop": ["65", 0], "mask": ["13", 0], "blend_radius": 16, "restore_unmasked": True, "mask_mode": "soft"}},
+ "13": {"class_type": "RasterRelayMaskEdgeRefine", "inputs": {"image": ["16", 0], "mask": ["11", 0], "radius": 8, "edge_sensitivity": 0.02, "strength": 1.0}},
+ "94": {"class_type": "RasterRelayVaeDriftMatch", "inputs": {"original_crop": ["10", 0], "generated_crop": ["16", 0], "mask": ["13", 0], "blend_radius": 16, "restore_unmasked": True, "mask_mode": "soft"}},
  # inside the mask: restore original where the model changed little (unintended
  # tone drift on background/skin -> mask-shaped stains); keep where it changed
  # a lot (the intended edit). Measured bimodal split: drift <0.05, intent >0.15.
@@ -34,15 +42,17 @@ wf = {
  # Re-encode the stage-1 composite and run a short low-denoise pass over the
  # WHOLE crop: unifies grain/sharpness/colour response and melts the
  # keep/restore boundaries. DD patch is inert here (no noise mask).
- "70": {"class_type": "VAEEncode", "inputs": {"pixels": ["95", 0], "vae": ["40", 0]}},
+ "17": {"class_type": "ImageScale", "inputs": {"image": ["95", 0], "upscale_method": "lanczos", "width": 1024, "height": 1024, "crop": "disabled"}},
+ "70": {"class_type": "VAEEncode", "inputs": {"pixels": ["17", 0], "vae": ["40", 0]}},
  "71": {"class_type": "RandomNoise", "inputs": {"noise_seed": 1, "randomize_seed": "disable"}},
  "72": {"class_type": "SplitSigmasDenoise", "inputs": {"sigmas": ["62", 0], "denoise": 0.18}},
  "73": {"class_type": "SamplerCustomAdvanced", "inputs": {"noise": ["71", 0], "guider": ["63", 0], "sampler": ["61", 0], "sigmas": ["72", 1], "latent_image": ["70", 0]}},
  "74": {"class_type": "VAEDecode", "inputs": {"samples": ["73", 0], "vae": ["40", 0]}},
+ "18": {"class_type": "ImageScale", "inputs": {"image": ["74", 0], "upscale_method": "lanczos", "width": 1024, "height": 768, "crop": "disabled"}},
  # ---- colour-response calibration (intent-safe cast removal) -------------
  # Fit the model's affine colour drift on should-be-unchanged pixels and
  # invert it on the whole refined result (cannot revert semantic edits).
- "93": {"class_type": "RasterRelayColorCalibrate", "inputs": {"original_image": ["10", 0], "generated_image": ["74", 0], "mask": ["13", 0], "drift_threshold": 0.10, "strength": 1.0}},
+ "93": {"class_type": "RasterRelayColorCalibrate", "inputs": {"original_image": ["10", 0], "generated_image": ["18", 0], "mask": ["13", 0], "drift_threshold": 0.10, "strength": 1.0}},
  # stage-2 restore after the refine pass touched everything
  "88": {"class_type": "RasterRelayVaeDriftMatch", "inputs": {"original_crop": ["10", 0], "generated_crop": ["93", 0], "mask": ["13", 0], "blend_radius": 16, "restore_unmasked": True, "mask_mode": "soft"}},
  "89": {"class_type": "RasterRelayBackgroundPreserve", "inputs": {"original_image": ["10", 0], "generated_image": ["88", 0], "mask": ["13", 0], "object_luma_max": 0.58, "red_keep_threshold": 0.08, "blend_radius": 16, "change_keep_threshold": 0.10}},
@@ -70,12 +80,18 @@ mapping = {
   "seed": {"nodeId": "60", "inputName": "noise_seed"},
   "seedRandomize": {"nodeId": "60", "inputName": "randomize_seed"},
   "lorasJson": {"nodeId": "90", "inputName": "loras_json"},
-  "width": [{"nodeId": "21", "inputName": "width"}, {"nodeId": "62", "inputName": "width"}],
-  "height": [{"nodeId": "21", "inputName": "height"}, {"nodeId": "62", "inputName": "height"}],
+  "width": [{"nodeId": "21", "inputName": "width"}, {"nodeId": "62", "inputName": "width"},
+            {"nodeId": "14", "inputName": "width"}, {"nodeId": "15", "inputName": "width"},
+            {"nodeId": "17", "inputName": "width"}],
+  "height": [{"nodeId": "21", "inputName": "height"}, {"nodeId": "62", "inputName": "height"},
+             {"nodeId": "14", "inputName": "height"}, {"nodeId": "15", "inputName": "height"},
+             {"nodeId": "17", "inputName": "height"}],
   "cropLeft": {"nodeId": "91", "inputName": "crop_left"},
   "cropTop": {"nodeId": "91", "inputName": "crop_top"},
-  "cropWidth": {"nodeId": "91", "inputName": "crop_width"},
-  "cropHeight": {"nodeId": "91", "inputName": "crop_height"},
+  "cropWidth": [{"nodeId": "91", "inputName": "crop_width"},
+                {"nodeId": "16", "inputName": "width"}, {"nodeId": "18", "inputName": "width"}],
+  "cropHeight": [{"nodeId": "91", "inputName": "crop_height"},
+                 {"nodeId": "16", "inputName": "height"}, {"nodeId": "18", "inputName": "height"}],
   "docWidth": {"nodeId": "91", "inputName": "doc_width"},
   "docHeight": {"nodeId": "91", "inputName": "doc_height"},
   "toneRadius": {"nodeId": "96", "inputName": "tone_radius"},

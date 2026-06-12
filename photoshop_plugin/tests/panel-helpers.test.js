@@ -317,3 +317,25 @@ test("insertDynamicLoraChain returns false for empty loraItems", () => {
   assert.equal(helpers.insertDynamicLoraChain(workflow, chain, []), false);
   assert.equal(helpers.insertDynamicLoraChain(workflow, chain, null), false);
 });
+
+test("computeOptimalGenSize keeps small crops at native size (no upscale)", () => {
+  const r = helpers.computeOptimalGenSize(400, 300);
+  assert.ok(Math.abs(r.scale - 1.0) < 1e-9);
+  assert.equal(r.genWidth, 400);
+  assert.equal(r.genHeight, 304);
+});
+
+test("computeOptimalGenSize downscales huge crops toward ~1.15MP", () => {
+  const r = helpers.computeOptimalGenSize(3200, 2400);
+  // 7.68MP -> scale sqrt(1.18/7.68)=0.392 -> clamped to 0.5
+  assert.ok(Math.abs(r.scale - 0.5) < 1e-9);
+  assert.equal(r.genWidth, 1600);
+  assert.equal(r.genHeight, 1200);
+});
+
+test("computeOptimalGenSize output is multiple of 16", () => {
+  const r = helpers.computeOptimalGenSize(2000, 1500);
+  assert.equal(r.genWidth % 16, 0);
+  assert.equal(r.genHeight % 16, 0);
+  assert.ok(r.scale < 1.0 && r.scale >= 0.5);
+});

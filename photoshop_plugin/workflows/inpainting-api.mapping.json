@@ -46,6 +46,18 @@
       {
         "nodeId": "62",
         "inputName": "width"
+      },
+      {
+        "nodeId": "14",
+        "inputName": "width"
+      },
+      {
+        "nodeId": "15",
+        "inputName": "width"
+      },
+      {
+        "nodeId": "17",
+        "inputName": "width"
       }
     ],
     "height": [
@@ -55,6 +67,18 @@
       },
       {
         "nodeId": "62",
+        "inputName": "height"
+      },
+      {
+        "nodeId": "14",
+        "inputName": "height"
+      },
+      {
+        "nodeId": "15",
+        "inputName": "height"
+      },
+      {
+        "nodeId": "17",
         "inputName": "height"
       }
     ],
@@ -66,14 +90,34 @@
       "nodeId": "91",
       "inputName": "crop_top"
     },
-    "cropWidth": {
-      "nodeId": "91",
-      "inputName": "crop_width"
-    },
-    "cropHeight": {
-      "nodeId": "91",
-      "inputName": "crop_height"
-    },
+    "cropWidth": [
+      {
+        "nodeId": "91",
+        "inputName": "crop_width"
+      },
+      {
+        "nodeId": "16",
+        "inputName": "width"
+      },
+      {
+        "nodeId": "18",
+        "inputName": "width"
+      }
+    ],
+    "cropHeight": [
+      {
+        "nodeId": "91",
+        "inputName": "crop_height"
+      },
+      {
+        "nodeId": "16",
+        "inputName": "height"
+      },
+      {
+        "nodeId": "18",
+        "inputName": "height"
+      }
+    ],
     "docWidth": {
       "nodeId": "91",
       "inputName": "doc_width"
