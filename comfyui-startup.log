@@ -1,0 +1,55 @@
+[START] Security scan
+[DONE] Security scan
+## ComfyUI-Manager: installing dependencies done.
+** ComfyUI startup time: 2026-06-20 18:42:28.123
+** Platform: Windows
+** Python version: 3.12.9 (tags/v3.12.9:fdb8142, Feb  4 2025, 15:27:58) [MSC v.1942 64 bit (AMD64)]
+** Python executable: E:\AI\ComfyUI\.venv\Scripts\python.exe
+** ComfyUI Path: E:\AI\ComfyUI
+** ComfyUI Base Folder Path: E:\AI\ComfyUI
+** User directory: E:\AI\ComfyUI\user
+** ComfyUI-Manager config path: E:\AI\ComfyUI\user\__manager\config.ini
+** Log path: E:\AI\ComfyUI\user\comfyui.log
+[94mtheUpsiders Logic Nodes: [92mLoaded[0m
+[VideoHelperSuite] - [0;33mWARNING[0m - Failed to import imageio_ffmpeg
+[VideoHelperSuite] - [0;31mERROR[0m - No valid ffmpeg found.
+(pysssss:WD14Tagger) [ERROR] onnxruntime is required, please check requirements are installed.
+[36mEfficiency Nodes:[0m Attempting to add Control Net options to the 'HiRes-Fix Script' Node (comfyui_controlnet_aux add-on)...[91mFailed![0m
+
+[92m[rgthree-comfy] Loaded 48 exciting nodes. 🎉[0m
+
+[33m[rgthree-comfy] ComfyUI's new Node 2.0 rendering may be incompatible with some rgthree-comfy nodes and features, breaking some rendering as well as losing the ability to access a node's properties (a vital part of many nodes). It also appears to run MUCH more slowly spiking CPU usage and causing jankiness and unresponsiveness, especially with large workflows. Personally I am not planning to use the new Nodes 2.0 and, unfortunately, am not able to invest the time to investigate and overhaul rgthree-comfy where needed. If you have issues when Nodes 2.0 is enabled, I'd urge you to switch it off as well and join me in hoping ComfyUI is not planning to deprecate the existing, stable canvas rendering all together.
+[0m
+FETCH ComfyRegistry Data: 5/155
+FETCH ComfyRegistry Data: 10/155
+FETCH ComfyRegistry Data: 15/155
+FETCH ComfyRegistry Data: 20/155
+FETCH ComfyRegistry Data: 25/155
+FETCH ComfyRegistry Data: 30/155
+FETCH ComfyRegistry Data: 35/155
+FETCH ComfyRegistry Data: 40/155
+FETCH ComfyRegistry Data: 45/155
+FETCH ComfyRegistry Data: 50/155
+FETCH ComfyRegistry Data: 55/155
+FETCH ComfyRegistry Data: 60/155
+FETCH ComfyRegistry Data: 65/155
+FETCH ComfyRegistry Data: 70/155
+FETCH ComfyRegistry Data: 75/155
+FETCH ComfyRegistry Data: 80/155
+FETCH ComfyRegistry Data: 85/155
+FETCH ComfyRegistry Data: 90/155
+FETCH ComfyRegistry Data: 95/155
+FETCH ComfyRegistry Data: 100/155
+FETCH ComfyRegistry Data: 105/155
+FETCH ComfyRegistry Data: 110/155
+FETCH ComfyRegistry Data: 115/155
+FETCH ComfyRegistry Data: 120/155
+FETCH ComfyRegistry Data: 125/155
+FETCH ComfyRegistry Data: 130/155
+FETCH ComfyRegistry Data: 135/155
+FETCH ComfyRegistry Data: 140/155
+FETCH ComfyRegistry Data: 145/155
+FETCH ComfyRegistry Data: 150/155
+FETCH ComfyRegistry Data: 155/155
+FETCH ComfyRegistry Data [DONE]
+FETCH DATA from: https://raw.githubusercontent.com/ltdrdata/ComfyUI-Manager/main/custom-node-list.json [DONE]

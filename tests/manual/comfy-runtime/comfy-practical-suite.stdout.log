@@ -24,9 +24,9 @@
 [32m[INFO][0m Setting output directory to: C:\Users\Mierz\Desktop\RasterRelay\tests\manual\comfy-runtime\output
 [32m[INFO][0m Setting input directory to: C:\Users\Mierz\Desktop\RasterRelay\tests\manual\comfy-runtime\input
 [1m[33m[WARNING][0m WARNING: You need pytorch with cu130 or higher to use optimized CUDA operations.
-[32m[INFO][0m Found comfy_kitchen backend triton: {'available': False, 'disabled': True, 'unavailable_reason': "ImportError: No module named 'triton'", 'capabilities': []}
 [32m[INFO][0m Found comfy_kitchen backend eager: {'available': True, 'disabled': False, 'unavailable_reason': None, 'capabilities': ['apply_rope', 'apply_rope1', 'apply_rope_split_half', 'apply_rope_split_half1', 'dequantize_mxfp8', 'dequantize_nvfp4', 'dequantize_per_tensor_fp8', 'gemv_awq_w4a16', 'quantize_mxfp8', 'quantize_nvfp4', 'quantize_per_tensor_fp8', 'quantize_svdquant_w4a4', 'scaled_mm_mxfp8', 'scaled_mm_nvfp4', 'scaled_mm_svdquant_w4a4', 'stochastic_rounding_fp8']}
 [32m[INFO][0m Found comfy_kitchen backend cuda: {'available': True, 'disabled': True, 'unavailable_reason': None, 'capabilities': ['apply_rope', 'apply_rope1', 'apply_rope_split_half', 'apply_rope_split_half1', 'dequantize_nvfp4', 'dequantize_per_tensor_fp8', 'gemv_awq_w4a16', 'quantize_mxfp8', 'quantize_nvfp4', 'quantize_per_tensor_fp8', 'quantize_svdquant_w4a4', 'scaled_mm_nvfp4', 'scaled_mm_svdquant_w4a4', 'stochastic_rounding_fp8']}
+[32m[INFO][0m Found comfy_kitchen backend triton: {'available': False, 'disabled': True, 'unavailable_reason': "ImportError: No module named 'triton'", 'capabilities': []}
 [32m[INFO][0m Checkpoint files will always be loaded safely.
 [32m[INFO][0m Total VRAM 24575 MB, total RAM 32693 MB
 [32m[INFO][0m pytorch version: 2.11.0+cu128
@@ -52,16 +52,16 @@
 [1m[33m[WARNING][0m OpenCV not installed
 [32m[INFO][0m 
 Import times for custom nodes:
-[32m[INFO][0m    0.0 seconds: C:\Users\Mierz\Desktop\RasterRelay\tests\manual\comfy-runtime\custom_nodes\ComfyUI-GGUF
 [32m[INFO][0m    0.0 seconds: C:\Users\Mierz\Desktop\RasterRelay\tests\manual\comfy-runtime\custom_nodes\ComfyUI-KJNodes
-[32m[INFO][0m    0.2 seconds: C:\Users\Mierz\Desktop\RasterRelay\tests\manual\comfy-runtime\custom_nodes\rasterrelay_nodes
+[32m[INFO][0m    0.1 seconds: C:\Users\Mierz\Desktop\RasterRelay\tests\manual\comfy-runtime\custom_nodes\rasterrelay_nodes
+[32m[INFO][0m    0.2 seconds: C:\Users\Mierz\Desktop\RasterRelay\tests\manual\comfy-runtime\custom_nodes\ComfyUI-GGUF
 [32m[INFO][0m 
 [32m[INFO][0m Context impl SQLiteImpl.
 [32m[INFO][0m Will assume non-transactional DDL.
 [32m[INFO][0m Using RAM pressure cache.
 [32m[INFO][0m Starting server
 
-[32m[INFO][0m To see the GUI go to: http://127.0.0.1:8195
+[32m[INFO][0m To see the GUI go to: http://127.0.0.1:8188
 [32m[INFO][0m got prompt
 [32m[INFO][0m Using pytorch attention in VAE
 [32m[INFO][0m Using pytorch attention in VAE
@@ -79,79 +79,104 @@ Import times for custom nodes:
 [32m[INFO][0m Model Flux2TEModel_ prepared for dynamic VRAM loading. 8262MB Staged. 0 patches attached. Force pre-loaded 145 weights: 602 KB.
 [32m[INFO][0m Model Flux2TEModel_ prepared for dynamic VRAM loading. 8262MB Staged. 0 patches attached. Force pre-loaded 145 weights: 602 KB.
 [32m[INFO][0m Requested to load Flux2
-[32m[INFO][0m loaded completely; 13442.96 MB usable, 5828.04 MB loaded, full load: True
-[32m[INFO][0m Requested to load AutoencoderKL
+[32m[INFO][0m loaded completely; 13282.78 MB usable, 5828.04 MB loaded, full load: True
 [32m[INFO][0m Model AutoencoderKL prepared for dynamic VRAM loading. 160MB Staged. 0 patches attached. Force pre-loaded 110 weights: 187 KB.
-[32m[INFO][0m [32mPrompt executed in 38.15 seconds[0m
-[32m[INFO][0m got prompt
-[32m[INFO][0m Model AutoencoderKL prepared for dynamic VRAM loading. 160MB Staged. 0 patches attached. Force pre-loaded 110 weights: 187 KB.
-[32m[INFO][0m Model Flux2TEModel_ prepared for dynamic VRAM loading. 8262MB Staged. 0 patches attached. Force pre-loaded 145 weights: 602 KB.
-[32m[INFO][0m Requested to load Flux2
-[32m[INFO][0m loaded completely; 13442.96 MB usable, 5828.04 MB loaded, full load: True
-[32m[INFO][0m Requested to load AutoencoderKL
-[32m[INFO][0m Model AutoencoderKL prepared for dynamic VRAM loading. 160MB Staged. 0 patches attached. Force pre-loaded 110 weights: 187 KB.
-[32m[INFO][0m [32mPrompt executed in 28.03 seconds[0m
-[32m[INFO][0m got prompt
-[32m[INFO][0m Model AutoencoderKL prepared for dynamic VRAM loading. 160MB Staged. 0 patches attached. Force pre-loaded 110 weights: 187 KB.
-[32m[INFO][0m Model Flux2TEModel_ prepared for dynamic VRAM loading. 8262MB Staged. 0 patches attached. Force pre-loaded 145 weights: 602 KB.
-[32m[INFO][0m Requested to load Flux2
-[32m[INFO][0m loaded completely; 13442.96 MB usable, 5828.04 MB loaded, full load: True
-[32m[INFO][0m Requested to load AutoencoderKL
-[32m[INFO][0m Model AutoencoderKL prepared for dynamic VRAM loading. 160MB Staged. 0 patches attached. Force pre-loaded 110 weights: 187 KB.
-[32m[INFO][0m [32mPrompt executed in 12.96 seconds[0m
+[32m[INFO][0m [32mPrompt executed in 11.26 seconds[0m
 [32m[INFO][0m got prompt
 [32m[INFO][0m Model AutoencoderKL prepared for dynamic VRAM loading. 160MB Staged. 0 patches attached. Force pre-loaded 110 weights: 187 KB.
 [32m[INFO][0m Model Flux2TEModel_ prepared for dynamic VRAM loading. 8262MB Staged. 0 patches attached. Force pre-loaded 145 weights: 602 KB.
 [32m[INFO][0m Requested to load Flux2
 [32m[INFO][0m loaded completely; 13250.78 MB usable, 5828.04 MB loaded, full load: True
 [32m[INFO][0m Model AutoencoderKL prepared for dynamic VRAM loading. 160MB Staged. 0 patches attached. Force pre-loaded 110 weights: 187 KB.
-[32m[INFO][0m [32mPrompt executed in 13.46 seconds[0m
+[32m[INFO][0m [32mPrompt executed in 4.45 seconds[0m
 [32m[INFO][0m got prompt
 [32m[INFO][0m Model AutoencoderKL prepared for dynamic VRAM loading. 160MB Staged. 0 patches attached. Force pre-loaded 110 weights: 187 KB.
 [32m[INFO][0m Model Flux2TEModel_ prepared for dynamic VRAM loading. 8262MB Staged. 0 patches attached. Force pre-loaded 145 weights: 602 KB.
 [32m[INFO][0m Requested to load Flux2
 [32m[INFO][0m loaded completely; 13250.78 MB usable, 5828.04 MB loaded, full load: True
 [32m[INFO][0m Model AutoencoderKL prepared for dynamic VRAM loading. 160MB Staged. 0 patches attached. Force pre-loaded 110 weights: 187 KB.
-[32m[INFO][0m [32mPrompt executed in 14.00 seconds[0m
+[32m[INFO][0m [32mPrompt executed in 4.50 seconds[0m
 [32m[INFO][0m got prompt
 [32m[INFO][0m Model AutoencoderKL prepared for dynamic VRAM loading. 160MB Staged. 0 patches attached. Force pre-loaded 110 weights: 187 KB.
 [32m[INFO][0m Model Flux2TEModel_ prepared for dynamic VRAM loading. 8262MB Staged. 0 patches attached. Force pre-loaded 145 weights: 602 KB.
 [32m[INFO][0m Requested to load Flux2
 [32m[INFO][0m loaded completely; 13250.78 MB usable, 5828.04 MB loaded, full load: True
 [32m[INFO][0m Model AutoencoderKL prepared for dynamic VRAM loading. 160MB Staged. 0 patches attached. Force pre-loaded 110 weights: 187 KB.
-[32m[INFO][0m [32mPrompt executed in 12.71 seconds[0m
+[32m[INFO][0m [32mPrompt executed in 4.52 seconds[0m
 [32m[INFO][0m got prompt
 [32m[INFO][0m Model AutoencoderKL prepared for dynamic VRAM loading. 160MB Staged. 0 patches attached. Force pre-loaded 110 weights: 187 KB.
 [32m[INFO][0m Model Flux2TEModel_ prepared for dynamic VRAM loading. 8262MB Staged. 0 patches attached. Force pre-loaded 145 weights: 602 KB.
 [32m[INFO][0m Requested to load Flux2
 [32m[INFO][0m loaded completely; 13250.78 MB usable, 5828.04 MB loaded, full load: True
 [32m[INFO][0m Model AutoencoderKL prepared for dynamic VRAM loading. 160MB Staged. 0 patches attached. Force pre-loaded 110 weights: 187 KB.
-[32m[INFO][0m [32mPrompt executed in 30.18 seconds[0m
+[32m[INFO][0m [32mPrompt executed in 4.48 seconds[0m
 [32m[INFO][0m got prompt
 [32m[INFO][0m Model AutoencoderKL prepared for dynamic VRAM loading. 160MB Staged. 0 patches attached. Force pre-loaded 110 weights: 187 KB.
 [32m[INFO][0m Model Flux2TEModel_ prepared for dynamic VRAM loading. 8262MB Staged. 0 patches attached. Force pre-loaded 145 weights: 602 KB.
 [32m[INFO][0m Requested to load Flux2
 [32m[INFO][0m loaded completely; 13250.78 MB usable, 5828.04 MB loaded, full load: True
 [32m[INFO][0m Model AutoencoderKL prepared for dynamic VRAM loading. 160MB Staged. 0 patches attached. Force pre-loaded 110 weights: 187 KB.
-[32m[INFO][0m [32mPrompt executed in 12.94 seconds[0m
+[32m[INFO][0m [32mPrompt executed in 4.31 seconds[0m
 [32m[INFO][0m got prompt
 [32m[INFO][0m Model AutoencoderKL prepared for dynamic VRAM loading. 160MB Staged. 0 patches attached. Force pre-loaded 110 weights: 187 KB.
 [32m[INFO][0m Model Flux2TEModel_ prepared for dynamic VRAM loading. 8262MB Staged. 0 patches attached. Force pre-loaded 145 weights: 602 KB.
 [32m[INFO][0m Requested to load Flux2
 [32m[INFO][0m loaded completely; 13250.78 MB usable, 5828.04 MB loaded, full load: True
 [32m[INFO][0m Model AutoencoderKL prepared for dynamic VRAM loading. 160MB Staged. 0 patches attached. Force pre-loaded 110 weights: 187 KB.
-[32m[INFO][0m [32mPrompt executed in 21.81 seconds[0m
+[32m[INFO][0m [32mPrompt executed in 4.29 seconds[0m
 [32m[INFO][0m got prompt
 [32m[INFO][0m Model AutoencoderKL prepared for dynamic VRAM loading. 160MB Staged. 0 patches attached. Force pre-loaded 110 weights: 187 KB.
 [32m[INFO][0m Model Flux2TEModel_ prepared for dynamic VRAM loading. 8262MB Staged. 0 patches attached. Force pre-loaded 145 weights: 602 KB.
 [32m[INFO][0m Requested to load Flux2
 [32m[INFO][0m loaded completely; 13250.78 MB usable, 5828.04 MB loaded, full load: True
 [32m[INFO][0m Model AutoencoderKL prepared for dynamic VRAM loading. 160MB Staged. 0 patches attached. Force pre-loaded 110 weights: 187 KB.
-[32m[INFO][0m [32mPrompt executed in 17.51 seconds[0m
+[32m[INFO][0m [32mPrompt executed in 4.26 seconds[0m
 [32m[INFO][0m got prompt
 [32m[INFO][0m Model AutoencoderKL prepared for dynamic VRAM loading. 160MB Staged. 0 patches attached. Force pre-loaded 110 weights: 187 KB.
 [32m[INFO][0m Model Flux2TEModel_ prepared for dynamic VRAM loading. 8262MB Staged. 0 patches attached. Force pre-loaded 145 weights: 602 KB.
 [32m[INFO][0m Requested to load Flux2
 [32m[INFO][0m loaded completely; 13250.78 MB usable, 5828.04 MB loaded, full load: True
 [32m[INFO][0m Model AutoencoderKL prepared for dynamic VRAM loading. 160MB Staged. 0 patches attached. Force pre-loaded 110 weights: 187 KB.
-[32m[INFO][0m [32mPrompt executed in 13.08 seconds[0m
+[32m[INFO][0m [32mPrompt executed in 4.31 seconds[0m
+[32m[INFO][0m got prompt
+[32m[INFO][0m Model AutoencoderKL prepared for dynamic VRAM loading. 160MB Staged. 0 patches attached. Force pre-loaded 110 weights: 187 KB.
+[32m[INFO][0m Model Flux2TEModel_ prepared for dynamic VRAM loading. 8262MB Staged. 0 patches attached. Force pre-loaded 145 weights: 602 KB.
+[32m[INFO][0m Requested to load Flux2
+[32m[INFO][0m loaded completely; 13250.78 MB usable, 5828.04 MB loaded, full load: True
+[32m[INFO][0m Model AutoencoderKL prepared for dynamic VRAM loading. 160MB Staged. 0 patches attached. Force pre-loaded 110 weights: 187 KB.
+[32m[INFO][0m [32mPrompt executed in 4.27 seconds[0m
+[32m[INFO][0m got prompt
+[32m[INFO][0m Model AutoencoderKL prepared for dynamic VRAM loading. 160MB Staged. 0 patches attached. Force pre-loaded 110 weights: 187 KB.
+[32m[INFO][0m Model Flux2TEModel_ prepared for dynamic VRAM loading. 8262MB Staged. 0 patches attached. Force pre-loaded 145 weights: 602 KB.
+[32m[INFO][0m Requested to load Flux2
+[32m[INFO][0m loaded completely; 13250.78 MB usable, 5828.04 MB loaded, full load: True
+[32m[INFO][0m Model AutoencoderKL prepared for dynamic VRAM loading. 160MB Staged. 0 patches attached. Force pre-loaded 110 weights: 187 KB.
+[32m[INFO][0m [32mPrompt executed in 4.23 seconds[0m
+[32m[INFO][0m got prompt
+[32m[INFO][0m Model AutoencoderKL prepared for dynamic VRAM loading. 160MB Staged. 0 patches attached. Force pre-loaded 110 weights: 187 KB.
+[32m[INFO][0m Model Flux2TEModel_ prepared for dynamic VRAM loading. 8262MB Staged. 0 patches attached. Force pre-loaded 145 weights: 602 KB.
+[32m[INFO][0m Requested to load Flux2
+[32m[INFO][0m loaded completely; 13250.78 MB usable, 5828.04 MB loaded, full load: True
+[32m[INFO][0m Model AutoencoderKL prepared for dynamic VRAM loading. 160MB Staged. 0 patches attached. Force pre-loaded 110 weights: 187 KB.
+[32m[INFO][0m [32mPrompt executed in 4.22 seconds[0m
+[32m[INFO][0m got prompt
+[32m[INFO][0m Model AutoencoderKL prepared for dynamic VRAM loading. 160MB Staged. 0 patches attached. Force pre-loaded 110 weights: 187 KB.
+[32m[INFO][0m Model Flux2TEModel_ prepared for dynamic VRAM loading. 8262MB Staged. 0 patches attached. Force pre-loaded 145 weights: 602 KB.
+[32m[INFO][0m Requested to load Flux2
+[32m[INFO][0m loaded completely; 13250.78 MB usable, 5828.04 MB loaded, full load: True
+[32m[INFO][0m Model AutoencoderKL prepared for dynamic VRAM loading. 160MB Staged. 0 patches attached. Force pre-loaded 110 weights: 187 KB.
+[32m[INFO][0m [32mPrompt executed in 4.21 seconds[0m
+[32m[INFO][0m got prompt
+[32m[INFO][0m Model AutoencoderKL prepared for dynamic VRAM loading. 160MB Staged. 0 patches attached. Force pre-loaded 110 weights: 187 KB.
+[32m[INFO][0m Model Flux2TEModel_ prepared for dynamic VRAM loading. 8262MB Staged. 0 patches attached. Force pre-loaded 145 weights: 602 KB.
+[32m[INFO][0m Requested to load Flux2
+[32m[INFO][0m loaded completely; 13250.78 MB usable, 5828.04 MB loaded, full load: True
+[32m[INFO][0m Model AutoencoderKL prepared for dynamic VRAM loading. 160MB Staged. 0 patches attached. Force pre-loaded 110 weights: 187 KB.
+[32m[INFO][0m [32mPrompt executed in 4.20 seconds[0m
+[32m[INFO][0m got prompt
+[32m[INFO][0m Model AutoencoderKL prepared for dynamic VRAM loading. 160MB Staged. 0 patches attached. Force pre-loaded 110 weights: 187 KB.
+[32m[INFO][0m Model Flux2TEModel_ prepared for dynamic VRAM loading. 8262MB Staged. 0 patches attached. Force pre-loaded 145 weights: 602 KB.
+[32m[INFO][0m Requested to load Flux2
+[32m[INFO][0m loaded completely; 13250.78 MB usable, 5828.04 MB loaded, full load: True
+[32m[INFO][0m Model AutoencoderKL prepared for dynamic VRAM loading. 160MB Staged. 0 patches attached. Force pre-loaded 110 weights: 187 KB.
+[32m[INFO][0m [32mPrompt executed in 4.21 seconds[0m

@@ -2291,6 +2291,15 @@ function boundsSizeMatches(expected, actual, tolerance = 2) {
   });
 }
 
+function getTopLeftAnchorPosition() {
+  const photoshop = getPhotoshopApi();
+  return (
+    photoshop?.constants?.AnchorPosition?.TOPLEFT ||
+    photoshop?.constants?.AnchorPosition?.TOP_LEFT ||
+    undefined
+  );
+}
+
 async function alignLayerToExpectedBounds(activeLayer, placementGeometry) {
   const expected = placementGeometry?.expectedBounds;
   let actual = readBoundsObject(activeLayer?.bounds);
@@ -2300,9 +2309,33 @@ async function alignLayerToExpectedBounds(activeLayer, placementGeometry) {
   }
 
   if (boundsSizeMatches(expected, actual) === false) {
-    throw new Error(
-      `Warstwa wyniku ma rozmiar bounds ${JSON.stringify(actual)}, a oczekiwano ${JSON.stringify(expected)}. Photoshop prawdopodobnie przeskalowal wstawiany PNG.`
-    );
+    const scaleX = actual.width ? (expected.width / actual.width) * 100 : null;
+    const scaleY = actual.height ? (expected.height / actual.height) * 100 : null;
+    if (!Number.isFinite(scaleX) || !Number.isFinite(scaleY)) {
+      throw new Error(
+        `Warstwa wyniku ma niepoprawny rozmiar bounds ${JSON.stringify(actual)}, a oczekiwano ${JSON.stringify(expected)}.`
+      );
+    }
+
+    if (typeof activeLayer.scale !== "function") {
+      throw new Error(
+        `Warstwa wyniku ma rozmiar bounds ${JSON.stringify(actual)}, a oczekiwano ${JSON.stringify(expected)}. Photoshop nie udostepnia layer.scale dla automatycznej korekty.`
+      );
+    }
+
+    await activeLayer.scale(scaleX, scaleY, getTopLeftAnchorPosition());
+    actual = readBoundsObject(activeLayer.bounds);
+    placementGeometry.scaleCorrection = {
+      scaleX,
+      scaleY,
+      boundsAfterScale: actual
+    };
+
+    if (boundsSizeMatches(expected, actual) === false) {
+      throw new Error(
+        `Po skalowaniu warstwa wyniku ma bounds ${JSON.stringify(actual)}, a oczekiwano ${JSON.stringify(expected)}.`
+      );
+    }
   }
 
   const dx = Math.round(expected.left - actual.left);
