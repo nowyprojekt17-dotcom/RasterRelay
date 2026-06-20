@@ -378,3 +378,87 @@ test("getGenerationMaskOptions grows more in removal mode", () => {
   assert.ok(removeOpts.growPx > editOpts.growPx, `${removeOpts.growPx} > ${editOpts.growPx}`);
   assert.equal(removeOpts.growPx - editOpts.growPx, removeOpts.extraGrowPx);
 });
+
+test("shouldUsePngAlphaOnly detects change-alpha ComfyUI outputs", () => {
+  assert.equal(
+    helpers.shouldUsePngAlphaOnly({
+      alphaBBox: { left: 10, top: 20, right: 30, bottom: 40 }
+    }),
+    true
+  );
+  assert.equal(
+    helpers.shouldUsePngAlphaOnly({
+      comfy: { alphaBBox: { left: 10, top: 20, right: 30, bottom: 40 } }
+    }),
+    true
+  );
+});
+
+test("shouldUsePngAlphaOnly keeps legacy outputs on Photoshop mask path", () => {
+  assert.equal(helpers.shouldUsePngAlphaOnly({}), false);
+  assert.equal(helpers.shouldUsePngAlphaOnly({ alphaBBox: { left: 0, top: 0 } }), false);
+});
+
+test("isLayerVisibilityProtected accepts applied masks and png alpha skips", () => {
+  assert.equal(helpers.isLayerVisibilityProtected({ applied: true, source: "active-selection" }), true);
+  assert.equal(
+    helpers.isLayerVisibilityProtected({ applied: false, skipped: true, source: "png-change-alpha" }),
+    true
+  );
+});
+
+test("isLayerVisibilityProtected rejects unchecked missing masks", () => {
+  assert.equal(helpers.isLayerVisibilityProtected(null), false);
+  assert.equal(helpers.isLayerVisibilityProtected({ applied: false, skipped: true, source: "active-selection" }), false);
+  assert.equal(helpers.isLayerVisibilityProtected({ applied: false }), false);
+});
+
+test("shouldRejectCompositeAudit accepts only checked passing audits", () => {
+  assert.equal(helpers.shouldRejectCompositeAudit({ checked: true, passed: true }), false);
+  assert.equal(helpers.shouldRejectCompositeAudit({ checked: true, passed: false }), true);
+  assert.equal(helpers.shouldRejectCompositeAudit({ skipped: true, reason: "no pixels" }), true);
+  assert.equal(helpers.shouldRejectCompositeAudit(null), true);
+});
+
+test("maxSourceChromaError accepts luminance-only changes", () => {
+  const before = new Uint8Array([40, 80, 120]);
+  const after = new Uint8Array([50, 90, 130]);
+  assert.equal(helpers.maxSourceChromaError(before, 0, after, 0), 0);
+});
+
+test("maxSourceChromaError detects channel relationship changes", () => {
+  const before = new Uint8Array([40, 80, 120]);
+  const after = new Uint8Array([70, 90, 130]);
+  assert.equal(helpers.maxSourceChromaError(before, 0, after, 0), 20);
+});
+
+test("sourceHueError accepts luminance-only changes", () => {
+  const before = new Uint8Array([40, 80, 120]);
+  const after = new Uint8Array([50, 90, 130]);
+  assert.equal(helpers.sourceHueError(before, 0, after, 0), 0);
+});
+
+test("sourceHueError skips low-saturation source pixels", () => {
+  const before = new Uint8Array([80, 80, 80]);
+  const after = new Uint8Array([120, 40, 80]);
+  assert.equal(helpers.sourceHueError(before, 0, after, 0), null);
+});
+
+test("sourceHueError skips unstable low-chroma source pixels", () => {
+  const before = new Uint8Array([100, 99, 92]);
+  const after = new Uint8Array([92, 92, 85]);
+  assert.equal(helpers.sourceHueError(before, 0, after, 0), null);
+  assert.equal(helpers.sourceSaturationError(before, 0, after, 0), null);
+});
+
+test("sourceSaturationError detects saturation drift", () => {
+  const before = new Uint8Array([40, 80, 120]);
+  const after = new Uint8Array([50, 90, 130]);
+  assert.ok(helpers.sourceSaturationError(before, 0, after, 0) > 0);
+});
+
+test("sourceSaturationError accepts preserved saturation", () => {
+  const before = new Uint8Array([40, 80, 120]);
+  const after = new Uint8Array([60, 120, 180]);
+  assert.ok(helpers.sourceSaturationError(before, 0, after, 0) < 1e-12);
+});

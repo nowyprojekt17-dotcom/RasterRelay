@@ -1,0 +1,62 @@
+{
+  "prompt_id": "097a6e26-8570-47ca-9206-036ee994978c",
+  "result_path": "C:\\Users\\Mierz\\Desktop\\RasterRelay\\tests\\manual\\comfy-runtime\\output\\RasterRelay\\practical-suite\\king-robe-ornament_00007_.png",
+  "image_meta": {
+    "filename": "king-robe-ornament_00007_.png",
+    "subfolder": "RasterRelay/practical-suite",
+    "type": "output",
+    "absolute_path": "C:\\Users\\Mierz\\Desktop\\RasterRelay\\tests\\manual\\comfy-runtime\\output\\RasterRelay/practical-suite\\king-robe-ornament_00007_.png",
+    "width": 256,
+    "height": 256,
+    "alpha_bbox": {
+      "left": 92,
+      "top": 112,
+      "right": 167,
+      "bottom": 197,
+      "width": 75,
+      "height": 85
+    }
+  },
+  "result_size": [
+    256,
+    256
+  ],
+  "alpha_positive_pixels": 2980,
+  "alpha_positive_percent": 4.547119140625,
+  "alpha_bbox": {
+    "left": 92,
+    "top": 112,
+    "right": 167,
+    "bottom": 197
+  },
+  "max_diff_where_alpha_zero_after_composite": 0,
+  "max_diff_anywhere_after_composite": 97,
+  "raw_rgb_max_diff_where_alpha_zero": 0,
+  "source_chroma_max_error_where_alpha_positive_after_composite": 0,
+  "source_chroma_mean_error_where_alpha_positive_after_composite": 0.0,
+  "raw_source_chroma_max_error_where_alpha_positive": 3,
+  "source_hue_checked_pixels": 1618,
+  "source_hue_skipped_low_chroma_pixels": 1362,
+  "source_hue_min_checked_delta_rgb_levels": 40,
+  "source_hue_max_error_degrees_where_alpha_positive_after_composite": 1.1444091796875e-05,
+  "source_hue_mean_error_degrees_where_alpha_positive_after_composite": 1.3509403515854501e-06,
+  "raw_source_hue_max_error_degrees_where_alpha_positive": 1.7647037506103516,
+  "source_saturation_max_error_where_alpha_positive_after_composite": 0.33767735958099365,
+  "source_saturation_mean_error_where_alpha_positive_after_composite": 0.03924858942627907,
+  "raw_source_saturation_max_error_where_alpha_positive": 0.3382352590560913,
+  "composite_changed_pixels": 2980,
+  "composite_changed_percent": 4.547119140625,
+  "case_name": "king-robe-ornament",
+  "source_image": "C:\\Users\\Mierz\\Desktop\\RasterRelay\\tests\\manual\\test-images\\domosul2.webp",
+  "prompt": "Add ornate embroidery detail to the selected robe area while preserving the original gold, cream and smoky warm colour palette exactly.",
+  "negative_prompt": "hue shift, saturation shift, color cast, changed paint colour, changed fabric colour, altered unmasked area, visible seam, halo, pasted edge, washed out colour, oversaturated colour",
+  "mask_box": [
+    86,
+    112,
+    172,
+    196
+  ],
+  "mask_shape": "ellipse",
+  "audit_source_path": "C:\\Users\\Mierz\\Desktop\\RasterRelay\\tests\\manual\\comfy-output\\practical-suite\\king-robe-ornament-audit-source.png",
+  "audit_mask_path": "C:\\Users\\Mierz\\Desktop\\RasterRelay\\tests\\manual\\comfy-output\\practical-suite\\king-robe-ornament-audit-mask.png"
+}

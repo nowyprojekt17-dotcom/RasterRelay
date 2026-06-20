@@ -30,6 +30,26 @@ Write-Step "Kopiuje custom nodes z $sourceDir do $targetDir"
 New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
 Copy-Item -Path (Join-Path $sourceDir "*") -Destination $targetDir -Recurse -Force
 
+Write-Step "Sprawdzam zgodnosc skopiowanych node'ow z aktualnym workflow"
+$padPath = Join-Path $targetDir "nodes\pad_to_document.py"
+$lockPath = Join-Path $targetDir "nodes\color_calibrate.py"
+$requiredMarkers = @(
+    @{ Path = $padPath; Text = "precompensate_alpha_composite" },
+    @{ Path = $padPath; Text = "force_opaque_for_composite_lock" },
+    @{ Path = $lockPath; Text = "source_chroma_strength" },
+    @{ Path = $lockPath; Text = "source_luma_strength" },
+    @{ Path = $lockPath; Text = "source_saturation_strength" }
+)
+
+foreach ($marker in $requiredMarkers) {
+    if (-not (Test-Path -Path $marker.Path)) {
+        throw "Brakuje pliku po instalacji: $($marker.Path)"
+    }
+    if (-not (Select-String -Path $marker.Path -Pattern $marker.Text -SimpleMatch -Quiet)) {
+        throw "Skopiowany node nie zawiera wymaganego wejscia workflow: $($marker.Text) w $($marker.Path)"
+    }
+}
+
 Write-Step "Instalacja gotowa. Zrestartuj ComfyUI zeby zaladowal nowe wezly."
 Write-Step "Custom nodes RasterRelay:"
 Get-ChildItem -Path (Join-Path $targetDir "nodes") -Filter "*.py" | ForEach-Object {

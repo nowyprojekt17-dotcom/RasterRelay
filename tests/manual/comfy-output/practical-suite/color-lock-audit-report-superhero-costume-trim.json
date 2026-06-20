@@ -1,0 +1,62 @@
+{
+  "prompt_id": "be5ae60a-706b-4439-89ee-a4c7dd62b51a",
+  "result_path": "C:\\Users\\Mierz\\Desktop\\RasterRelay\\tests\\manual\\comfy-runtime\\output\\RasterRelay\\practical-suite\\superhero-costume-trim_00003_.png",
+  "image_meta": {
+    "filename": "superhero-costume-trim_00003_.png",
+    "subfolder": "RasterRelay/practical-suite",
+    "type": "output",
+    "absolute_path": "C:\\Users\\Mierz\\Desktop\\RasterRelay\\tests\\manual\\comfy-runtime\\output\\RasterRelay/practical-suite\\superhero-costume-trim_00003_.png",
+    "width": 256,
+    "height": 256,
+    "alpha_bbox": {
+      "left": 80,
+      "top": 70,
+      "right": 177,
+      "bottom": 191,
+      "width": 97,
+      "height": 121
+    }
+  },
+  "result_size": [
+    256,
+    256
+  ],
+  "alpha_positive_pixels": 5185,
+  "alpha_positive_percent": 7.91168212890625,
+  "alpha_bbox": {
+    "left": 80,
+    "top": 70,
+    "right": 177,
+    "bottom": 191
+  },
+  "max_diff_where_alpha_zero_after_composite": 0,
+  "max_diff_anywhere_after_composite": 28,
+  "raw_rgb_max_diff_where_alpha_zero": 0,
+  "source_chroma_max_error_where_alpha_positive_after_composite": 0,
+  "source_chroma_mean_error_where_alpha_positive_after_composite": 0.0,
+  "raw_source_chroma_max_error_where_alpha_positive": 4,
+  "source_hue_checked_pixels": 2596,
+  "source_hue_skipped_low_chroma_pixels": 1651,
+  "source_hue_min_checked_delta_rgb_levels": 40,
+  "source_hue_max_error_degrees_where_alpha_positive_after_composite": 3.0517578125e-05,
+  "source_hue_mean_error_degrees_where_alpha_positive_after_composite": 4.4232800178178877e-07,
+  "raw_source_hue_max_error_degrees_where_alpha_positive": 3.240023374557495,
+  "source_saturation_max_error_where_alpha_positive_after_composite": 0.24163877964019775,
+  "source_saturation_mean_error_where_alpha_positive_after_composite": 0.02366042509675026,
+  "raw_source_saturation_max_error_where_alpha_positive": 0.337837815284729,
+  "composite_changed_pixels": 5185,
+  "composite_changed_percent": 7.91168212890625,
+  "case_name": "superhero-costume-trim",
+  "source_image": "C:\\Users\\Mierz\\Desktop\\RasterRelay\\tests\\manual\\test-images\\ChatGPT Image 15 cze 2026, 00_18_58.png",
+  "prompt": "Add fine stitched costume trim and subtle fabric texture in the selected superhero suit area. Preserve the original red, blue and gold comic colours exactly.",
+  "negative_prompt": "hue shift, saturation shift, color cast, changed paint colour, changed fabric colour, altered unmasked area, visible seam, halo, pasted edge, washed out colour, oversaturated colour",
+  "mask_box": [
+    80,
+    62,
+    176,
+    190
+  ],
+  "mask_shape": "ellipse",
+  "audit_source_path": "C:\\Users\\Mierz\\Desktop\\RasterRelay\\tests\\manual\\comfy-output\\practical-suite\\superhero-costume-trim-audit-source.png",
+  "audit_mask_path": "C:\\Users\\Mierz\\Desktop\\RasterRelay\\tests\\manual\\comfy-output\\practical-suite\\superhero-costume-trim-audit-mask.png"
+}

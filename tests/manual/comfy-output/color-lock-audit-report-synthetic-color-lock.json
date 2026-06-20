@@ -1,0 +1,53 @@
+{
+  "prompt_id": "b2eefc40-5e68-4b46-b509-c7295dab8117",
+  "result_path": "C:\\Users\\Mierz\\Desktop\\RasterRelay\\tests\\manual\\comfy-runtime\\output\\RasterRelay\\source-chroma-audit_00014_.png",
+  "image_meta": {
+    "filename": "source-chroma-audit_00014_.png",
+    "subfolder": "RasterRelay",
+    "type": "output",
+    "absolute_path": "C:\\Users\\Mierz\\Desktop\\RasterRelay\\tests\\manual\\comfy-runtime\\output\\RasterRelay\\source-chroma-audit_00014_.png",
+    "width": 256,
+    "height": 256,
+    "alpha_bbox": {
+      "left": 64,
+      "top": 64,
+      "right": 193,
+      "bottom": 193,
+      "width": 129,
+      "height": 129
+    }
+  },
+  "result_size": [
+    256,
+    256
+  ],
+  "alpha_positive_pixels": 11854,
+  "alpha_positive_percent": 18.0877685546875,
+  "alpha_bbox": {
+    "left": 64,
+    "top": 64,
+    "right": 193,
+    "bottom": 193
+  },
+  "max_diff_where_alpha_zero_after_composite": 0,
+  "max_diff_anywhere_after_composite": 36,
+  "raw_rgb_max_diff_where_alpha_zero": 0,
+  "source_chroma_max_error_where_alpha_positive_after_composite": 29,
+  "source_chroma_mean_error_where_alpha_positive_after_composite": 11.64771385186435,
+  "raw_source_chroma_max_error_where_alpha_positive": 29,
+  "source_hue_checked_pixels": 11854,
+  "source_hue_skipped_low_chroma_pixels": 0,
+  "source_hue_min_checked_delta_rgb_levels": 40,
+  "source_hue_max_error_degrees_where_alpha_positive_after_composite": 0.3665771484375,
+  "source_hue_mean_error_degrees_where_alpha_positive_after_composite": 0.10671503096818924,
+  "raw_source_hue_max_error_degrees_where_alpha_positive": 0.313873291015625,
+  "source_saturation_max_error_where_alpha_positive_after_composite": 0.0030053257942199707,
+  "source_saturation_mean_error_where_alpha_positive_after_composite": 0.0011209617368876934,
+  "raw_source_saturation_max_error_where_alpha_positive": 0.0030053257942199707,
+  "composite_changed_pixels": 11334,
+  "composite_changed_percent": 17.2943115234375,
+  "case_name": "synthetic-color-lock",
+  "source_image": null,
+  "audit_source_path": "C:\\Users\\Mierz\\Desktop\\RasterRelay\\tests\\manual\\comfy-output\\synthetic-color-lock-audit-source.png",
+  "audit_mask_path": "C:\\Users\\Mierz\\Desktop\\RasterRelay\\tests\\manual\\comfy-output\\synthetic-color-lock-audit-mask.png"
+}

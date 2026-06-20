@@ -1,0 +1,53 @@
+{
+  "prompt_id": "2c3cab37-a707-424c-b625-fd272185428e",
+  "result_path": "C:\\Users\\Mierz\\Desktop\\RasterRelay\\tests\\manual\\comfy-runtime\\output\\RasterRelay\\source-chroma-audit_00013_.png",
+  "image_meta": {
+    "filename": "source-chroma-audit_00013_.png",
+    "subfolder": "RasterRelay",
+    "type": "output",
+    "absolute_path": "C:\\Users\\Mierz\\Desktop\\RasterRelay\\tests\\manual\\comfy-runtime\\output\\RasterRelay\\source-chroma-audit_00013_.png",
+    "width": 256,
+    "height": 256,
+    "alpha_bbox": {
+      "left": 82,
+      "top": 96,
+      "right": 161,
+      "bottom": 172,
+      "width": 79,
+      "height": 76
+    }
+  },
+  "result_size": [
+    256,
+    256
+  ],
+  "alpha_positive_pixels": 2208,
+  "alpha_positive_percent": 3.369140625,
+  "alpha_bbox": {
+    "left": 82,
+    "top": 96,
+    "right": 161,
+    "bottom": 172
+  },
+  "max_diff_where_alpha_zero_after_composite": 0,
+  "max_diff_anywhere_after_composite": 56,
+  "raw_rgb_max_diff_where_alpha_zero": 0,
+  "source_chroma_max_error_where_alpha_positive_after_composite": 34,
+  "source_chroma_mean_error_where_alpha_positive_after_composite": 2.5317028985507246,
+  "raw_source_chroma_max_error_where_alpha_positive": 34,
+  "source_hue_checked_pixels": 896,
+  "source_hue_skipped_low_chroma_pixels": 1306,
+  "source_hue_min_checked_delta_rgb_levels": 40,
+  "source_hue_max_error_degrees_where_alpha_positive_after_composite": 1.0890541076660156,
+  "source_hue_mean_error_degrees_where_alpha_positive_after_composite": 0.1571846455335617,
+  "raw_source_hue_max_error_degrees_where_alpha_positive": 1.0890541076660156,
+  "source_saturation_max_error_where_alpha_positive_after_composite": 0.008838355541229248,
+  "source_saturation_mean_error_where_alpha_positive_after_composite": 0.0014543065335601568,
+  "raw_source_saturation_max_error_where_alpha_positive": 0.008072972297668457,
+  "composite_changed_pixels": 1729,
+  "composite_changed_percent": 2.63824462890625,
+  "case_name": "can-source-practical",
+  "source_image": "C:\\Users\\Mierz\\Desktop\\RasterRelay\\photoshop_plugin\\test_assets\\can-source.png",
+  "audit_source_path": "C:\\Users\\Mierz\\Desktop\\RasterRelay\\tests\\manual\\comfy-output\\can-source-practical-audit-source.png",
+  "audit_mask_path": "C:\\Users\\Mierz\\Desktop\\RasterRelay\\tests\\manual\\comfy-output\\can-source-practical-audit-mask.png"
+}

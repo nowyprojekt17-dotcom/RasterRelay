@@ -534,11 +534,40 @@
       "grain_clip": 0.04
     }
   },
+  "99": {
+    "class_type": "RasterRelayReferenceColorLock",
+    "inputs": {
+      "original_image": [
+        "10",
+        0
+      ],
+      "generated_image": [
+        "98",
+        0
+      ],
+      "mask": [
+        "13",
+        0
+      ],
+      "lock_threshold": 0.075,
+      "transition_width": 0.025,
+      "blur_radius": 48,
+      "chroma_strength": 1.0,
+      "luma_strength": 0.35,
+      "source_chroma_strength": 1.0,
+      "source_luma_strength": 1.0,
+      "source_saturation_strength": 1.0
+    }
+  },
   "91": {
     "class_type": "RasterRelayPadToDocument",
     "inputs": {
       "image": [
-        "98",
+        "99",
+        0
+      ],
+      "original_image": [
+        "10",
         0
       ],
       "mask": [
@@ -551,7 +580,13 @@
       "crop_height": 768,
       "doc_width": 1024,
       "doc_height": 768,
-      "alpha_mode": "crop"
+      "alpha_mode": "change",
+      "change_threshold": 0.018,
+      "change_transition_width": 0.004,
+      "alpha_grow": 0,
+      "alpha_feather": 0,
+      "precompensate_alpha_composite": true,
+      "force_opaque_for_composite_lock": true
     }
   },
   "80": {

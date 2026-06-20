@@ -396,6 +396,122 @@
     return cleanUserPrompt ? `${universalEditPrompt} User request: ${cleanUserPrompt}` : universalEditPrompt;
   }
 
+  function channelDifferenceTriplet(data, offset = 0) {
+    const red = data[offset];
+    const green = data[offset + 1];
+    const blue = data[offset + 2];
+    return [red - green, red - blue, green - blue];
+  }
+
+  function maxSourceChromaError(beforeData, beforeOffset, afterData, afterOffset) {
+    const beforeDiffs = channelDifferenceTriplet(beforeData, beforeOffset);
+    const afterDiffs = channelDifferenceTriplet(afterData, afterOffset);
+    let maxError = 0;
+
+    for (let index = 0; index < beforeDiffs.length; index += 1) {
+      maxError = Math.max(maxError, Math.abs(beforeDiffs[index] - afterDiffs[index]));
+    }
+
+    return maxError;
+  }
+
+  function hueAndSaturation(data, offset = 0) {
+    const red = data[offset] / 255;
+    const green = data[offset + 1] / 255;
+    const blue = data[offset + 2] / 255;
+    const maxChannel = Math.max(red, green, blue);
+    const minChannel = Math.min(red, green, blue);
+    const delta = maxChannel - minChannel;
+    const saturation = maxChannel > 1e-6 ? delta / maxChannel : 0;
+    let hue = 0;
+
+    if (delta > 2 / 255) {
+      if (maxChannel === red) {
+        hue = 60 * (((green - blue) / delta) % 6);
+      } else if (maxChannel === green) {
+        hue = 60 * ((blue - red) / delta + 2);
+      } else {
+        hue = 60 * ((red - green) / delta + 4);
+      }
+      if (hue < 0) {
+        hue += 360;
+      }
+    }
+
+      return { hue, saturation, delta };
+    }
+
+    function sourceHueError(
+      beforeData,
+      beforeOffset,
+      afterData,
+      afterOffset,
+      saturationThreshold = 0.05,
+      minChromaDelta = 40 / 255
+    ) {
+      const before = hueAndSaturation(beforeData, beforeOffset);
+      if (before.saturation <= saturationThreshold || before.delta < minChromaDelta) {
+        return null;
+      }
+
+      const after = hueAndSaturation(afterData, afterOffset);
+      const diff = Math.abs(before.hue - after.hue);
+      return Math.min(diff, 360 - diff);
+    }
+
+    function sourceSaturationError(
+      beforeData,
+      beforeOffset,
+      afterData,
+      afterOffset,
+      saturationThreshold = 0.05,
+      minChromaDelta = 40 / 255
+    ) {
+      const before = hueAndSaturation(beforeData, beforeOffset);
+      if (before.saturation <= saturationThreshold || before.delta < minChromaDelta) {
+        return null;
+      }
+
+      const after = hueAndSaturation(afterData, afterOffset);
+    return Math.abs(before.saturation - after.saturation);
+  }
+
+  function hasValidAlphaBBox(alphaBBox) {
+    if (!alphaBBox || typeof alphaBBox !== "object") {
+      return false;
+    }
+
+    return ["left", "top", "right", "bottom"].every((key) => Number.isFinite(Number(alphaBBox[key])));
+  }
+
+  function shouldUsePngAlphaOnly(outputMetadata = {}) {
+    const alphaBBox = outputMetadata.alphaBBox || outputMetadata.comfy?.alphaBBox || null;
+    return hasValidAlphaBBox(alphaBBox);
+  }
+
+  function isLayerVisibilityProtected(layerMask = {}) {
+    return Boolean(
+      layerMask?.applied ||
+        (layerMask?.skipped === true && layerMask?.source === "png-change-alpha")
+    );
+  }
+
+  function shouldRejectCompositeAudit(audit = null) {
+    if (!audit) {
+      return true;
+    }
+
+    if (audit.skipped) {
+      return true;
+    }
+
+    if (audit.checked) {
+      return audit.passed !== true;
+    }
+
+    return true;
+  }
+
   function setWorkflowInput(workflow, mappingItem, value) {
     if (!mappingItem) {
       return;
@@ -477,12 +593,18 @@
     getUniqueValueCount,
     hasSoftEdge,
     insertDynamicLoraChain,
+    isLayerVisibilityProtected,
+    maxSourceChromaError,
     normalizeQualitySettings,
     resolveQualityPlan,
     resolveEditModePlan,
     parseLoraItems,
     parseLoraToken,
     setWorkflowInput,
+    shouldRejectCompositeAudit,
+    shouldUsePngAlphaOnly,
+    sourceHueError,
+    sourceSaturationError,
     softenGrayscaleMask,
     universalEditPrompt
   };

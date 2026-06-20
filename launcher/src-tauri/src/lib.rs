@@ -24,6 +24,106 @@ struct ComfyProcessState {
     child: Mutex<Option<Child>>,
 }
 
+#[derive(Clone, Debug)]
+struct RasterRelayRuntimeDirs {
+    base: PathBuf,
+    input: PathBuf,
+    output: PathBuf,
+    temp: PathBuf,
+    custom_nodes: PathBuf,
+    extra_model_paths: PathBuf,
+    database: PathBuf,
+}
+
+fn rasterrelay_runtime_dirs() -> RasterRelayRuntimeDirs {
+    let root = env::temp_dir().join("RasterRelay");
+    let base = root.join("comfy-runtime");
+    RasterRelayRuntimeDirs {
+        input: root.join("comfy-input"),
+        output: root.join("comfy-output"),
+        temp: root.join("comfy-temp"),
+        custom_nodes: base.join("custom_nodes"),
+        extra_model_paths: root.join("extra_model_paths.yaml"),
+        database: base.join("comfyui.db"),
+        base,
+    }
+}
+
+fn ensure_rasterrelay_runtime_dirs() -> std::io::Result<RasterRelayRuntimeDirs> {
+    let dirs = rasterrelay_runtime_dirs();
+    fs::create_dir_all(&dirs.base)?;
+    fs::create_dir_all(&dirs.input)?;
+    fs::create_dir_all(&dirs.output)?;
+    fs::create_dir_all(&dirs.temp)?;
+    fs::create_dir_all(&dirs.custom_nodes)?;
+    Ok(dirs)
+}
+
+fn write_extra_model_paths_config(comfyui_root: &Path, target: &Path) -> std::io::Result<()> {
+    let base_path = path_text(comfyui_root).replace('\\', "/");
+    let text = format!(
+        "comfyui:\n  base_path: {base_path}\n  checkpoints: models/checkpoints\n  clip: models/clip\n  clip_vision: models/clip_vision\n  configs: models/configs\n  controlnet: models/controlnet\n  diffusers: models/diffusers\n  diffusion_models: models/diffusion_models\n  embeddings: models/embeddings\n  gligen: models/gligen\n  hypernetworks: models/hypernetworks\n  loras: models/loras\n  photomaker: models/photomaker\n  style_models: models/style_models\n  text_encoders: models/text_encoders\n  unet: models/unet\n  upscale_models: models/upscale_models\n  vae: models/vae\n"
+    );
+    fs::write(target, text)
+}
+
+fn copy_dir_recursive(source: &Path, destination: &Path) -> std::io::Result<()> {
+    fs::create_dir_all(destination)?;
+    for entry in fs::read_dir(source)? {
+        let entry = entry?;
+        let source_path = entry.path();
+        let file_name = entry.file_name();
+        if file_name == ".git" || file_name == "__pycache__" || file_name == ".pytest_cache" {
+            continue;
+        }
+        let destination_path = destination.join(file_name);
+        if source_path.is_dir() {
+            copy_dir_recursive(&source_path, &destination_path)?;
+        } else if source_path.is_file() {
+            if let Some(parent) = destination_path.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            fs::copy(&source_path, &destination_path)?;
+        }
+    }
+    Ok(())
+}
+
+fn sync_rasterrelay_nodes_to_runtime(custom_nodes: &Path) -> std::io::Result<()> {
+    let source = repo_root_path().join("comfy_nodes");
+    let destination = custom_nodes.join("rasterrelay_nodes");
+    fs::create_dir_all(&destination)?;
+    for child in ["nodes", "server", "utils"] {
+        copy_dir_recursive(&source.join(child), &destination.join(child))?;
+    }
+    for file in ["__init__.py", "pyproject.toml"] {
+        fs::copy(source.join(file), destination.join(file))?;
+    }
+    Ok(())
+}
+
+fn sync_required_custom_node_dependencies(
+    comfyui_root: &Path,
+    custom_nodes: &Path,
+) -> std::io::Result<()> {
+    let source_custom_nodes = comfyui_root.join("custom_nodes");
+    for dependency in ["ComfyUI-GGUF", "ComfyUI-KJNodes"] {
+        let source = source_custom_nodes.join(dependency);
+        if source.is_dir() {
+            copy_dir_recursive(&source, &custom_nodes.join(dependency))?;
+        }
+    }
+    Ok(())
+}
+
+fn prepare_rasterrelay_comfy_runtime(comfyui_root: &Path) -> std::io::Result<RasterRelayRuntimeDirs> {
+    let dirs = ensure_rasterrelay_runtime_dirs()?;
+    sync_rasterrelay_nodes_to_runtime(&dirs.custom_nodes)?;
+    sync_required_custom_node_dependencies(comfyui_root, &dirs.custom_nodes)?;
+    write_extra_model_paths_config(comfyui_root, &dirs.extra_model_paths)?;
+    Ok(dirs)
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct ReadinessReport {
@@ -577,9 +677,39 @@ fn start_comfyui(
             };
         }
 
+        let runtime_dirs = match prepare_rasterrelay_comfy_runtime(&root) {
+            Ok(dirs) => dirs,
+            Err(error) => {
+                drop(guard);
+                let status = runtime_status(&state);
+                return ComfyRuntimeActionResult {
+                    success: false,
+                    status,
+                    message: format!("Nie udało się przygotować izolowanego runtime ComfyUI RasterRelay: {error}"),
+                };
+            }
+        };
+
         let python_path = find_python_executable(&root);
         let mut command = Command::new(python_path);
-        command.arg("main.py").current_dir(&root);
+        command
+            .arg("main.py")
+            .arg("--base-directory")
+            .arg(&runtime_dirs.base)
+            .arg("--input-directory")
+            .arg(&runtime_dirs.input)
+            .arg("--output-directory")
+            .arg(&runtime_dirs.output)
+            .arg("--temp-directory")
+            .arg(&runtime_dirs.temp)
+            .arg("--extra-model-paths-config")
+            .arg(&runtime_dirs.extra_model_paths)
+            .arg("--database-url")
+            .arg(format!("sqlite:///{}", path_text(&runtime_dirs.database).replace('\\', "/")))
+            .current_dir(&root);
+        command.env("PYTHONIOENCODING", "utf-8");
+        command.env("PYTHONUTF8", "1");
+        command.env("RASTERRELAY_OUTPUT_DIR", &runtime_dirs.output);
 
         if show_console {
             command
@@ -1861,6 +1991,7 @@ fn workflow_has_required_classes(workflow: &Value) -> bool {
         "VAEDecode",
         "RasterRelayLoraStack",
         "RasterRelayPadToDocument",
+        "RasterRelayReferenceColorLock",
         "RasterRelaySaveImage",
     ];
 
@@ -2131,6 +2262,10 @@ fn required_workflow_nodes(object_info: Option<&Value>) -> Vec<WorkflowNodeStatu
         (
             "RasterRelayPadToDocument",
             "Wstawienie wyniku z wycinka na pelny rozmiar dokumentu z przezroczystoscia.",
+        ),
+        (
+            "RasterRelayReferenceColorLock",
+            "Finalna blokada koloru: przywraca dryf w masce do oryginalu i trzyma palete zrodla.",
         ),
     ];
 
@@ -3232,7 +3367,8 @@ mod tests {
           "65": { "class_type": "VAEDecode", "inputs": {} },
           "80": { "class_type": "RasterRelaySaveImage", "inputs": {} },
           "90": { "class_type": "RasterRelayLoraStack", "inputs": {} },
-          "91": { "class_type": "RasterRelayPadToDocument", "inputs": {} }
+          "91": { "class_type": "RasterRelayPadToDocument", "inputs": {} },
+          "99": { "class_type": "RasterRelayReferenceColorLock", "inputs": {} }
         }"#
     }
 
@@ -3252,6 +3388,25 @@ mod tests {
         assert!(has_source, "sourceImage mapping missing");
         assert!(has_mask, "selectionMask mapping missing");
         assert!(has_prompt, "prompt mapping missing");
+    }
+
+    #[test]
+    fn integration_mapping_keeps_final_source_saturation_lock() {
+        let mapping_path = repo_root_path()
+            .join("photoshop_plugin")
+            .join("workflows")
+            .join("inpainting-api.mapping.json");
+        let mapping = read_json_file(&mapping_path).expect("read workflow mapping");
+        let saturation_input = mapping
+            .get("inputs")
+            .and_then(|inputs| inputs.get("colorLockSourceSaturationStrength"))
+            .expect("colorLockSourceSaturationStrength mapping");
+
+        assert_eq!(saturation_input.get("nodeId").and_then(Value::as_str), Some("99"));
+        assert_eq!(
+            saturation_input.get("inputName").and_then(Value::as_str),
+            Some("source_saturation_strength")
+        );
     }
 
     #[test]
@@ -3550,6 +3705,52 @@ mod tests {
         assert!(exit.success(), "python script should exit cleanly");
 
         fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn rasterrelay_runtime_dirs_live_under_temp_and_are_created() {
+        let dirs = ensure_rasterrelay_runtime_dirs().expect("runtime dirs");
+        let root = env::temp_dir().join("RasterRelay");
+
+        assert!(dirs.base.starts_with(&root));
+        assert!(dirs.input.starts_with(&root));
+        assert!(dirs.output.starts_with(&root));
+        assert!(dirs.temp.starts_with(&root));
+        assert!(dirs.custom_nodes.starts_with(&root));
+        assert!(dirs.extra_model_paths.starts_with(&root));
+        assert!(dirs.database.starts_with(&root));
+        assert!(dirs.base.ends_with("comfy-runtime"));
+        assert!(dirs.input.ends_with("comfy-input"));
+        assert!(dirs.output.ends_with("comfy-output"));
+        assert!(dirs.temp.ends_with("comfy-temp"));
+        assert!(dirs.custom_nodes.ends_with("custom_nodes"));
+        assert!(dirs.extra_model_paths.ends_with("extra_model_paths.yaml"));
+        assert!(dirs.database.ends_with("comfyui.db"));
+        assert!(dirs.base.is_dir());
+        assert!(dirs.input.is_dir());
+        assert!(dirs.output.is_dir());
+        assert!(dirs.temp.is_dir());
+        assert!(dirs.custom_nodes.is_dir());
+    }
+
+    #[test]
+    fn extra_model_paths_config_points_to_selected_comfyui_root() {
+        let root = temp_dir("extra-model-paths-root");
+        let target_dir = temp_dir("extra-model-paths-target");
+        fs::create_dir_all(&root).expect("create root");
+        fs::create_dir_all(&target_dir).expect("create target");
+        let target = target_dir.join("extra_model_paths.yaml");
+
+        write_extra_model_paths_config(&root, &target).expect("write config");
+        let text = fs::read_to_string(&target).expect("read config");
+
+        assert!(text.contains(&path_text(&root).replace('\\', "/")));
+        assert!(text.contains("unet: models/unet"));
+        assert!(text.contains("text_encoders: models/text_encoders"));
+        assert!(text.contains("vae: models/vae"));
+
+        fs::remove_dir_all(root).ok();
+        fs::remove_dir_all(target_dir).ok();
     }
 
     #[test]

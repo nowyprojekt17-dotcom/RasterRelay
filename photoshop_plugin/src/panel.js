@@ -8,6 +8,7 @@ const QUALITY_SETTINGS_FILE_NAME = "rasterrelay-quality-settings.json";
 const LORA_CONFIG_FILE_NAME = "rasterrelay-lora-config.json";
 const WORKFLOW_FILE_NAME = "workflows/inpainting-api.json";
 const WORKFLOW_MAPPING_FILE_NAME = "workflows/inpainting-api.mapping.json";
+const INSTALL_NODES_COMMAND = "powershell -ExecutionPolicy Bypass -File .\\scripts\\install-comfy-nodes.ps1 -ComfyRoot E:\\AI\\ComfyUI";
 const E2E_AUTOSTART_FILE_NAME = "e2e-autostart.flag";
 const GEOMETRY_AUTOSTART_FILE_NAME = "geometry-autostart.flag";
 const GEOMETRY_TEST_SOURCE_FILE_NAME = "test_assets/can-source.png";
@@ -359,6 +360,304 @@ function readDocumentSize(document) {
     width: readUnitValue(document.width),
     height: readUnitValue(document.height)
   };
+}
+
+function normalizeAlphaBBox(outputMetadata = {}) {
+  const alphaBBox =
+    outputMetadata.alphaBBox ||
+    outputMetadata.alpha_bbox ||
+    outputMetadata.comfy?.alphaBBox ||
+    outputMetadata.comfy?.alpha_bbox ||
+    null;
+
+  if (!alphaBBox || typeof alphaBBox !== "object") {
+    return null;
+  }
+
+  const normalized = {
+    left: Number(alphaBBox.left),
+    top: Number(alphaBBox.top),
+    right: Number(alphaBBox.right),
+    bottom: Number(alphaBBox.bottom)
+  };
+
+  if (!["left", "top", "right", "bottom"].every((key) => Number.isFinite(normalized[key]))) {
+    return null;
+  }
+
+  return {
+    left: Math.round(normalized.left),
+    top: Math.round(normalized.top),
+    right: Math.round(normalized.right),
+    bottom: Math.round(normalized.bottom)
+  };
+}
+
+function createSkippedCompositeAudit(reason) {
+  return {
+    checked: false,
+    skipped: true,
+    passed: null,
+    reason: reason || "Composite audit was not available."
+  };
+}
+
+function createCompositeAuditError(message, audit) {
+  const error = new Error(message);
+  error.compositeAudit = audit || null;
+  return error;
+}
+
+function shouldRejectCompositeAudit(audit) {
+  if (panelHelpers.shouldRejectCompositeAudit) {
+    return panelHelpers.shouldRejectCompositeAudit(audit);
+  }
+
+  if (!audit || audit.skipped) {
+    return true;
+  }
+
+  return audit.checked ? audit.passed !== true : true;
+}
+
+async function getDocumentCompositeSnapshot(document, size = readDocumentSize(document)) {
+  const photoshop = getPhotoshopApi();
+
+  if (!photoshop?.imaging?.getPixels) {
+    throw new Error("Photoshop imaging.getPixels is unavailable.");
+  }
+
+  if (!document?.id) {
+    throw new Error("Active Photoshop document is unavailable.");
+  }
+
+  const width = Math.round(size.width);
+  const height = Math.round(size.height);
+  if (!width || !height) {
+    throw new Error(`Invalid document size for composite audit: ${width}x${height}.`);
+  }
+
+  const pixelResult = await photoshop.imaging.getPixels({
+    documentID: document.id,
+    sourceBounds: {
+      left: 0,
+      top: 0,
+      right: width,
+      bottom: height
+    },
+    componentSize: 8,
+    colorSpace: "RGB",
+    applyAlpha: true
+  });
+
+  try {
+    const imageData = pixelResult.imageData;
+    const data = await imageData.getData({ chunky: true });
+
+    return {
+      width: imageData.width,
+      height: imageData.height,
+      components: imageData.components,
+      componentSize: imageData.componentSize,
+      pixelFormat: imageData.pixelFormat,
+      sourceBounds: pixelResult.sourceBounds || { left: 0, top: 0, right: width, bottom: height },
+      data: new Uint8Array(data)
+    };
+  } finally {
+    pixelResult.imageData?.dispose?.();
+  }
+}
+
+function assertFullDocumentSnapshot(snapshot, size, label) {
+  const width = Math.round(size.width);
+  const height = Math.round(size.height);
+  if (snapshot.width !== width || snapshot.height !== height) {
+    throw new Error(`${label} snapshot has ${snapshot.width}x${snapshot.height}, expected ${width}x${height}.`);
+  }
+  if (snapshot.components < 3 || snapshot.componentSize !== 8) {
+    throw new Error(
+      `${label} snapshot has unsupported format components=${snapshot.components}, componentSize=${snapshot.componentSize}.`
+    );
+  }
+  const bounds = snapshot.sourceBounds || {};
+  if (Math.round(bounds.left || 0) !== 0 || Math.round(bounds.top || 0) !== 0) {
+    throw new Error(`${label} snapshot source bounds start at ${JSON.stringify(bounds)}, expected document origin.`);
+  }
+}
+
+function maxCompositeSourceChromaError(beforeData, beforeOffset, afterData, afterOffset) {
+  if (panelHelpers.maxSourceChromaError) {
+    return panelHelpers.maxSourceChromaError(beforeData, beforeOffset, afterData, afterOffset);
+  }
+
+  const beforeDiffs = [
+    beforeData[beforeOffset] - beforeData[beforeOffset + 1],
+    beforeData[beforeOffset] - beforeData[beforeOffset + 2],
+    beforeData[beforeOffset + 1] - beforeData[beforeOffset + 2]
+  ];
+  const afterDiffs = [
+    afterData[afterOffset] - afterData[afterOffset + 1],
+    afterData[afterOffset] - afterData[afterOffset + 2],
+    afterData[afterOffset + 1] - afterData[afterOffset + 2]
+  ];
+
+  return beforeDiffs.reduce((maxError, beforeDiff, index) => {
+    return Math.max(maxError, Math.abs(beforeDiff - afterDiffs[index]));
+  }, 0);
+}
+
+function auditCompositeColorLock(beforeSnapshot, afterSnapshot, outputMetadata, size) {
+  const alphaBBox = normalizeAlphaBBox(outputMetadata);
+  if (!alphaBBox) {
+    throw new Error("Output image did not include valid alphaBBox metadata.");
+  }
+
+  assertFullDocumentSnapshot(beforeSnapshot, size, "before");
+  assertFullDocumentSnapshot(afterSnapshot, size, "after");
+
+  const width = Math.round(size.width);
+  const height = Math.round(size.height);
+  const beforeStep = beforeSnapshot.components;
+  const afterStep = afterSnapshot.components;
+  let outsideChangedPixels = 0;
+  let maxDiffOutsideAlphaBBox = 0;
+  let insideChangedPixels = 0;
+  let sourceChromaMaxErrorInsideChanged = 0;
+  let sourceChromaErrorSumInsideChanged = 0;
+  let sourceChromaCheckedPixels = 0;
+  let sourceHueMaxErrorInsideChanged = 0;
+  let sourceHueErrorSumInsideChanged = 0;
+  let sourceHueCheckedPixels = 0;
+  let sourceSaturationMaxErrorInsideChanged = 0;
+  let sourceSaturationErrorSumInsideChanged = 0;
+  let sourceSaturationCheckedPixels = 0;
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const beforeOffset = (y * width + x) * beforeStep;
+      const afterOffset = (y * width + x) * afterStep;
+      let diff = 0;
+
+      for (let channel = 0; channel < 3; channel += 1) {
+        diff = Math.max(diff, Math.abs(beforeSnapshot.data[beforeOffset + channel] - afterSnapshot.data[afterOffset + channel]));
+      }
+
+      const insideAlphaBBox =
+        x >= alphaBBox.left &&
+        x < alphaBBox.right &&
+        y >= alphaBBox.top &&
+        y < alphaBBox.bottom;
+
+      if (insideAlphaBBox) {
+        if (diff > 0) {
+          insideChangedPixels += 1;
+          const chromaError = maxCompositeSourceChromaError(
+            beforeSnapshot.data,
+            beforeOffset,
+            afterSnapshot.data,
+            afterOffset
+          );
+          sourceChromaMaxErrorInsideChanged = Math.max(sourceChromaMaxErrorInsideChanged, chromaError);
+          sourceChromaErrorSumInsideChanged += chromaError;
+          sourceChromaCheckedPixels += 1;
+
+          if (panelHelpers.sourceHueError) {
+            const hueError = panelHelpers.sourceHueError(
+              beforeSnapshot.data,
+              beforeOffset,
+              afterSnapshot.data,
+              afterOffset
+            );
+            if (hueError !== null) {
+              sourceHueMaxErrorInsideChanged = Math.max(sourceHueMaxErrorInsideChanged, hueError);
+              sourceHueErrorSumInsideChanged += hueError;
+              sourceHueCheckedPixels += 1;
+            }
+          }
+          if (panelHelpers.sourceSaturationError) {
+            const saturationError = panelHelpers.sourceSaturationError(
+              beforeSnapshot.data,
+              beforeOffset,
+              afterSnapshot.data,
+              afterOffset
+            );
+            if (saturationError !== null) {
+              sourceSaturationMaxErrorInsideChanged = Math.max(sourceSaturationMaxErrorInsideChanged, saturationError);
+              sourceSaturationErrorSumInsideChanged += saturationError;
+              sourceSaturationCheckedPixels += 1;
+            }
+          }
+        }
+      } else if (diff > 0) {
+        outsideChangedPixels += 1;
+        maxDiffOutsideAlphaBBox = Math.max(maxDiffOutsideAlphaBBox, diff);
+      }
+    }
+  }
+
+  return {
+    checked: true,
+    skipped: false,
+    alphaBBox,
+    outsideChangedPixels,
+    maxDiffOutsideAlphaBBox,
+    insideChangedPixels,
+    sourceChromaCheckedPixels,
+    sourceChromaMaxErrorInsideChanged,
+    sourceChromaMeanErrorInsideChanged: sourceChromaCheckedPixels
+      ? sourceChromaErrorSumInsideChanged / sourceChromaCheckedPixels
+      : 0,
+    sourceHueCheckedPixels,
+    sourceHueMaxErrorInsideChanged,
+    sourceHueMeanErrorInsideChanged: sourceHueCheckedPixels
+      ? sourceHueErrorSumInsideChanged / sourceHueCheckedPixels
+      : 0,
+    sourceSaturationCheckedPixels,
+    sourceSaturationMaxErrorInsideChanged,
+    sourceSaturationMeanErrorInsideChanged: sourceSaturationCheckedPixels
+      ? sourceSaturationErrorSumInsideChanged / sourceSaturationCheckedPixels
+      : 0,
+    passed:
+      outsideChangedPixels === 0 &&
+      maxDiffOutsideAlphaBBox === 0 &&
+      sourceChromaMaxErrorInsideChanged <= 1 &&
+      (sourceHueCheckedPixels === 0 || sourceHueMaxErrorInsideChanged <= 1.5)
+  };
+  }
+
+async function createCompositeAuditContext(outputMetadata = {}) {
+  const usesChangeAlpha = panelHelpers.shouldUsePngAlphaOnly
+    ? panelHelpers.shouldUsePngAlphaOnly(outputMetadata)
+    : Boolean(normalizeAlphaBBox(outputMetadata));
+
+  if (!usesChangeAlpha) {
+    return {
+      required: true,
+      beforeSnapshot: null,
+      documentSize: null,
+      skippedAudit: createSkippedCompositeAudit("Output has no change-alpha bbox metadata.")
+    };
+  }
+
+  try {
+    const document = getActiveDocument();
+    const documentSize = readDocumentSize(document);
+    const beforeSnapshot = await getDocumentCompositeSnapshot(document, documentSize);
+
+    return {
+      required: true,
+      beforeSnapshot,
+      documentSize,
+      skippedAudit: null
+    };
+  } catch (error) {
+    return {
+      required: true,
+      beforeSnapshot: null,
+      documentSize: null,
+      skippedAudit: createSkippedCompositeAudit(error.message || String(error))
+    };
+  }
 }
 
 function normalizeSelectionBounds(bounds) {
@@ -1707,7 +2006,7 @@ async function queueComfyWorkflow(job, comfyUploads) {
   const unsupportedInputs = findUnsupportedWorkflowInputs(workflow, objectInfo);
   if (unsupportedInputs.length) {
     throw new Error(
-      `ComfyUI ma nieaktualne albo niezgodne custom nodes. Brakuje wejsc workflow: ${unsupportedInputs.join(", ")}. Zainstaluj ponownie RasterRelay nodes i zrestartuj ComfyUI.`
+      `ComfyUI ma nieaktualne albo niezgodne custom nodes. Brakuje wejsc workflow: ${unsupportedInputs.join(", ")}. Zatrzymaj ComfyUI, uruchom w katalogu projektu: ${INSTALL_NODES_COMMAND}, potem zrestartuj ComfyUI.`
     );
   }
 
@@ -1847,12 +2146,19 @@ async function waitForComfyOutput(promptId) {
 }
 
 async function downloadComfyImage(image, dataFolder) {
-  const params = new URLSearchParams({
-    filename: image.filename,
-    subfolder: image.subfolder || "",
-    type: image.type || "output"
-  });
-  const response = await fetch(`${COMFYUI_BASE_URL}/view?${params.toString()}`);
+  const absolutePath = image.absolute_path || image.absolutePath || "";
+  const params = absolutePath
+    ? new URLSearchParams({ path: absolutePath })
+    : new URLSearchParams({
+        filename: image.filename,
+        subfolder: image.subfolder || "",
+        type: image.type || "output"
+      });
+  const response = await fetch(
+    absolutePath
+      ? `${COMFYUI_BASE_URL}/rasterrelay/view?${params.toString()}`
+      : `${COMFYUI_BASE_URL}/view?${params.toString()}`
+  );
 
   if (!response.ok) {
     throw new Error(`Nie udało się pobrać wyniku z ComfyUI: HTTP ${response.status}`);
@@ -1878,6 +2184,7 @@ async function downloadComfyImage(image, dataFolder) {
         filename: image.filename,
         subfolder: image.subfolder || "",
         type: image.type || "output",
+        absolutePath,
         width: image.width || null,
         height: image.height || null,
         alphaBBox: image.alpha_bbox || image.alphaBBox || null
@@ -1999,11 +2306,16 @@ async function placeImageFileAsLayer(file, layerName = "RasterRelay - wynik", la
   }
 
   const token = await uxp.storage.localFileSystem.createSessionToken(file);
+  const usePngAlphaOnly = panelHelpers.shouldUsePngAlphaOnly(outputMetadata);
   const placement = {
     layerMode: "placed-embedded",
     layerMask: {
       applied: false,
-      source: "active-selection"
+      source: usePngAlphaOnly ? "png-change-alpha" : "active-selection",
+      skipped: usePngAlphaOnly,
+      reason: usePngAlphaOnly
+        ? "ComfyUI result carries exact change alpha; Photoshop layer mask would reintroduce broad-mask color blending."
+        : null
     },
     geometry: null
   };
@@ -2019,9 +2331,11 @@ async function placeImageFileAsLayer(file, layerName = "RasterRelay - wynik", la
   await photoshop.core.executeAsModal(
     async () => {
       try {
-        const capturedMask = layerMaskData
-          ? await createCapturedMaskFromPixels(photoshop, layerMaskData)
-          : await captureSoftSelectionMaskForLayer(photoshop);
+        const capturedMask = usePngAlphaOnly
+          ? null
+          : layerMaskData
+            ? await createCapturedMaskFromPixels(photoshop, layerMaskData)
+            : await captureSoftSelectionMaskForLayer(photoshop);
 
         await photoshop.action.batchPlay(
           [
@@ -2063,11 +2377,20 @@ async function placeImageFileAsLayer(file, layerName = "RasterRelay - wynik", la
             );
           }
         }
-        placement.layerMask = capturedMask?.captured
-          ? await applyCapturedMaskToActiveLayer(photoshop, placement.layerId, capturedMask)
-          : await applySelectionMaskToActiveLayer(photoshop, placement.layerId);
-        if (!placement.layerMask?.applied) {
-          throw new Error(`Nie udało się nałożyć maski warstwy wyniku: ${placement.layerMask?.error || placement.layerMask?.fallback || "unknown error"}`);
+        if (usePngAlphaOnly) {
+          placement.layerMask = {
+            applied: false,
+            skipped: true,
+            source: "png-change-alpha",
+            reason: "ComfyUI result carries exact change alpha; Photoshop layer mask was intentionally skipped."
+          };
+        } else {
+          placement.layerMask = capturedMask?.captured
+            ? await applyCapturedMaskToActiveLayer(photoshop, placement.layerId, capturedMask)
+            : await applySelectionMaskToActiveLayer(photoshop, placement.layerId);
+          if (!placement.layerMask?.applied) {
+            throw new Error(`Nie udało się nałożyć maski warstwy wyniku: ${placement.layerMask?.error || placement.layerMask?.fallback || "unknown error"}`);
+          }
         }
         await clearActiveSelection(photoshop);
       } catch (error) {
@@ -2280,6 +2603,37 @@ async function deleteLayerById(photoshop, layerId) {
     ],
     {}
   );
+}
+
+async function deletePlacedLayerAfterFailedAudit(layerId) {
+  const photoshop = getPhotoshopApi();
+
+  if (!photoshop?.action?.batchPlay || !layerId) {
+    return {
+      deleted: false,
+      error: "Photoshop layer deletion API is unavailable or layer id is missing."
+    };
+  }
+
+  try {
+    if (photoshop.core?.executeAsModal) {
+      await photoshop.core.executeAsModal(
+        async () => {
+          await deleteLayerById(photoshop, layerId);
+        },
+        { commandName: "RasterRelay Remove Failed Color Audit Layer" }
+      );
+    } else {
+      await deleteLayerById(photoshop, layerId);
+    }
+
+    return { deleted: true };
+  } catch (error) {
+    return {
+      deleted: false,
+      error: error.message || String(error)
+    };
+  }
 }
 
 async function makeLayerMaskFromActiveSelection(photoshop, layerId) {
@@ -2519,26 +2873,92 @@ async function applySelectionMaskToActiveLayer(photoshop, layerId) {
 async function receiveComfyResult(promptId, dataFolder, cropBounds, layerMaskData = null) {
   const output = await waitForComfyOutput(promptId);
   const downloaded = await downloadComfyImage(output.image, dataFolder);
+  const auditContext = await createCompositeAuditContext(downloaded.asset);
 
   try {
+    if (auditContext.required && auditContext.skippedAudit) {
+      throw createCompositeAuditError(
+        `Nie wstawiam wyniku bez pixel-audytu koloru: ${auditContext.skippedAudit.reason}`,
+        auditContext.skippedAudit
+      );
+    }
+
     const placement = await placeImageFileAsLayer(downloaded.file, "RasterRelay - wynik", layerMaskData, downloaded.asset);
+    let compositeAudit = auditContext.skippedAudit;
+
+    if (auditContext.beforeSnapshot && auditContext.documentSize) {
+      try {
+        const document = getActiveDocument();
+        const afterSnapshot = await getDocumentCompositeSnapshot(document, auditContext.documentSize);
+        compositeAudit = auditCompositeColorLock(
+          auditContext.beforeSnapshot,
+          afterSnapshot,
+          downloaded.asset,
+          auditContext.documentSize
+        );
+      } catch (auditError) {
+        compositeAudit = createSkippedCompositeAudit(auditError.message || String(auditError));
+      }
+    }
+
+    if (auditContext.required && compositeAudit?.skipped) {
+      const deletion = await deletePlacedLayerAfterFailedAudit(placement.layerId);
+      compositeAudit.failedLayerCleanup = deletion;
+      throw createCompositeAuditError(
+        `Nie zostawiam wyniku bez pelnego pixel-audytu koloru: ${compositeAudit.reason}`,
+        compositeAudit
+      );
+    }
+
+    if (compositeAudit?.checked && shouldRejectCompositeAudit(compositeAudit)) {
+      const deletion = await deletePlacedLayerAfterFailedAudit(placement.layerId);
+      compositeAudit.failedLayerCleanup = deletion;
+      throw createCompositeAuditError(
+        `RasterRelay pixel audit failed: outsideChanged=${compositeAudit.outsideChangedPixels}, outsideMaxDiff=${compositeAudit.maxDiffOutsideAlphaBBox}, sourceChromaMax=${compositeAudit.sourceChromaMaxErrorInsideChanged}.`,
+        compositeAudit
+      );
+    }
+
     downloaded.asset.photoshop = {
       placedAsLayer: true,
       layerMode: placement.layerMode,
       layerId: placement.layerId,
       layerMask: placement.layerMask,
-      placementGeometry: placement.geometry
+      placementGeometry: placement.geometry,
+      compositeAudit
     };
     downloaded.asset.placementGeometry = placement.geometry;
   } catch (error) {
     downloaded.asset.photoshop = {
       placedAsLayer: false,
       fallback: "downloaded-only",
-      error: error.message || String(error)
+      error: error.message || String(error),
+      compositeAudit:
+        error.compositeAudit ||
+        auditContext.skippedAudit ||
+        createSkippedCompositeAudit("Result was not placed as a Photoshop layer.")
     };
   }
 
   return downloaded.asset;
+}
+
+function describeCompositeAuditForStatus(audit) {
+  if (!audit) {
+    return "";
+  }
+
+  if (audit.checked) {
+    return audit.passed
+      ? ` Pixel audit OK: outsideChanged=${audit.outsideChangedPixels}, sourceHueMax=${audit.sourceHueMaxErrorInsideChanged ?? "n/a"}, sourceSatMax=${audit.sourceSaturationMaxErrorInsideChanged ?? "n/a"}.`
+      : ` Pixel audit FAILED: outsideChanged=${audit.outsideChangedPixels}, outsideMaxDiff=${audit.maxDiffOutsideAlphaBBox}, sourceChromaMax=${audit.sourceChromaMaxErrorInsideChanged}, sourceHueMax=${audit.sourceHueMaxErrorInsideChanged ?? "n/a"}, sourceSatMax=${audit.sourceSaturationMaxErrorInsideChanged ?? "n/a"}.`;
+  }
+
+  if (audit.skipped) {
+    return ` Pixel audit skipped: ${audit.reason}`;
+  }
+
+  return "";
 }
 
 async function saveJobPackage(job, dataFolder) {
@@ -2646,20 +3066,26 @@ async function prepareInpaintingEdit() {
     const resultAsset = packageResult.job.outputs.resultImages[0];
     packageResult.job.outputs.resultImage = resultAsset;
     packageResult.job.placementGeometry = resultAsset?.placementGeometry || resultAsset?.photoshop?.placementGeometry || null;
-    const maskApplied = Boolean(resultAsset?.photoshop?.layerMask?.applied);
+    const maskApplied = panelHelpers.isLayerVisibilityProtected(resultAsset?.photoshop?.layerMask);
+    const compositeAudit = resultAsset?.photoshop?.compositeAudit || null;
+    const auditStatusText = describeCompositeAuditForStatus(compositeAudit);
     const placedCount = packageResult.job.outputs.resultImages.filter((image) => image.photoshop?.placedAsLayer).length;
     packageResult.job.comfy.note = placedCount
-      ? maskApplied
-        ? `Pobrano ${packageResult.job.outputs.resultImages.length} wynik(i). Warstwy zostały wstawione do Photoshopa z maską.`
-        : `Pobrano ${packageResult.job.outputs.resultImages.length} wynik(i). Maska pierwszej warstwy wymaga sprawdzenia.`
+      ? compositeAudit?.checked && shouldRejectCompositeAudit(compositeAudit)
+        ? `Pobrano ${packageResult.job.outputs.resultImages.length} wynik(i), ale pixel audit koloru nie przeszedl.${auditStatusText}`
+        : maskApplied
+          ? `Pobrano ${packageResult.job.outputs.resultImages.length} wynik(i). Warstwy zostaly wstawione do Photoshopa z ochrona alfa/maski.${auditStatusText}`
+          : `Pobrano ${packageResult.job.outputs.resultImages.length} wynik(i). Ochrona pierwszej warstwy wymaga sprawdzenia.${auditStatusText}`
       : "Wyniki ComfyUI zostały pobrane, ale nie udało się wstawić ich automatycznie jako warstw.";
     await saveJobPackage(packageResult.job, packageResult.dataFolder);
 
     setMessage(
       resultAsset?.photoshop?.placedAsLayer
-        ? maskApplied
-          ? `Pobrano ${packageResult.job.outputs.resultImages.length} wynik(i) i wstawiono jako warstwy z maską.`
-          : `Pobrano ${packageResult.job.outputs.resultImages.length} wynik(i). Maska wymaga ręcznego sprawdzenia.`
+        ? compositeAudit?.checked && shouldRejectCompositeAudit(compositeAudit)
+          ? `Pobrano ${packageResult.job.outputs.resultImages.length} wynik(i), ale pixel audit koloru nie przeszedl.${auditStatusText}`
+          : maskApplied
+            ? `Pobrano ${packageResult.job.outputs.resultImages.length} wynik(i) i wstawiono jako warstwy z ochrona alfa/maski.${auditStatusText}`
+            : `Pobrano ${packageResult.job.outputs.resultImages.length} wynik(i). Ochrona warstwy wymaga recznego sprawdzenia.${auditStatusText}`
         : `Wyniki ComfyUI pobrane do plików, ale nie udało się wstawić warstw automatycznie: ${resultAsset?.photoshop?.error}`
     );
   } catch (error) {
@@ -2718,7 +3144,7 @@ async function checkRasterRelayReadiness() {
     const unsupportedInputs = findUnsupportedWorkflowInputs(workflow, objectInfo);
     if (unsupportedInputs.length) {
       setMessage(
-        `ComfyUI ma nieaktualne RasterRelay nodes. Brakuje wejsc: ${unsupportedInputs.join(", ")}. Zainstaluj nodes ponownie i zrestartuj ComfyUI.`
+        `ComfyUI ma nieaktualne RasterRelay nodes. Brakuje wejsc: ${unsupportedInputs.join(", ")}. Zatrzymaj ComfyUI, uruchom w katalogu projektu: ${INSTALL_NODES_COMMAND}, potem zrestartuj ComfyUI.`
       );
       return false;
     }
@@ -2814,11 +3240,17 @@ async function runE2ESmokeTest() {
 
   try {
     const result = await globalThis.RasterRelayE2ESmokeTest.run();
+    const audit = result?.compositeAudit;
     setMessage(
       result?.promptId
         ? `Test E2E zakończony. Wynik wstawiony jako warstwa. Prompt ID: ${result.promptId}.`
         : "Test E2E zakończony. Sprawdź nowy dokument i warstwę w Photoshopie."
     );
+    if (audit?.checked) {
+      setMessage(
+        `Test E2E OK. Pixel audit: outsideChanged=${audit.outsideChangedPixels}, maxDiff=${audit.maxDiffOutsideAlphaBBox}, sourceHueMax=${audit.sourceHueMaxErrorInsideChanged ?? "n/a"}, sourceSatMax=${audit.sourceSaturationMaxErrorInsideChanged ?? "n/a"}.`
+      );
+    }
   } catch (error) {
     setMessage(`Test E2E nie przeszedł: ${error.message || error}`);
   } finally {

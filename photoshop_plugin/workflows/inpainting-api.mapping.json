@@ -126,6 +126,18 @@
       "nodeId": "91",
       "inputName": "doc_height"
     },
+    "resultAlphaMode": {
+      "nodeId": "91",
+      "inputName": "alpha_mode"
+    },
+    "resultAlphaChangeThreshold": {
+      "nodeId": "91",
+      "inputName": "change_threshold"
+    },
+    "resultAlphaFeather": {
+      "nodeId": "91",
+      "inputName": "alpha_feather"
+    },
     "toneRadius": {
       "nodeId": "96",
       "inputName": "tone_radius"
@@ -172,6 +184,34 @@
       "nodeId": "93",
       "inputName": "strength"
     },
+    "colorLockThreshold": {
+      "nodeId": "99",
+      "inputName": "lock_threshold"
+    },
+    "colorLockBlurRadius": {
+      "nodeId": "99",
+      "inputName": "blur_radius"
+    },
+    "colorLockChromaStrength": {
+      "nodeId": "99",
+      "inputName": "chroma_strength"
+    },
+    "colorLockLumaStrength": {
+      "nodeId": "99",
+      "inputName": "luma_strength"
+    },
+    "colorLockSourceChromaStrength": {
+      "nodeId": "99",
+      "inputName": "source_chroma_strength"
+    },
+    "colorLockSourceLumaStrength": {
+      "nodeId": "99",
+      "inputName": "source_luma_strength"
+    },
+    "colorLockSourceSaturationStrength": {
+      "nodeId": "99",
+      "inputName": "source_saturation_strength"
+    },
     "refineSource": {
       "nodeId": "96",
       "inputName": "generated_image"
@@ -182,12 +222,15 @@
     "textEncoder": "qwen_3_8b_fp8mixed.safetensors",
     "vae": "flux2-vae.safetensors",
     "maskChannel": "LoadImageMask red channel. Plugin uploads the crop-local generation/denoise mask.",
-    "architecture": "gen(DD) -> VDM -> BgPreserve -> [REFINE: encode -> denoise 0.25 -> decode] -> ColorCalibrate -> VDM -> BgPreserve -> SeamlessTone(full, seam-band) -> SeamlessTone(chroma, seam-band) -> GrainTransfer -> PadToDocument.",
+    "architecture": "gen(DD) -> VDM -> BgPreserve -> [REFINE: encode -> denoise 0.25 -> decode] -> ColorCalibrate -> VDM -> BgPreserve -> SeamlessTone(full, seam-band) -> SeamlessTone(chroma, seam-band) -> GrainTransfer -> ReferenceColorLock -> PadToDocument(change-alpha).",
     "phaseB": "ColorCalibrate (cheap, always) measures the model's affine colour drift on should-be-unchanged pixels and inverts it on the whole result. The refine pass (encode->low-denoise->decode, melts internal boundaries) is OPTIONAL: node 96 reads node 93 (base) by default, or node 89 (refined) when refineSource is switched. ComfyUI prunes the refine branch when unused, so Fast/Balanced skip its cost entirely.",
     "presets": "Plugin sets refineSource per quality preset: fast/balanced -> ['93',0] (no refine, faster, higher intent retention); quality -> ['89',0] (refine on, smoothest internal blend). Steps via node 62.",
     "phaseC": "MaskEdgeRefine (guided filter) snaps the compositing mask to real image edges (hair strands keep their silhouette, no halo). Chroma-only SeamlessTone pass at large radius removes residual colour cast without touching luminance. GrainTransfer restores photographic grain so the patch shares the original's texture character. Generation/denoise path still uses the raw plugin mask (node 11) - refinement applies to compositing only.",
     "differentialDiffusion": "Model patch: soft mask becomes a per-pixel denoise gradient, so the model itself blends tone/texture progressively at the boundary. Measured -18% dL_seam / -22% seam_step on the hair-recolor case; neutral on easy cases. InpaintModelConditioning was tested and is a no-op for Flux2 Klein GGUF (pixel-identical output) - intentionally not used.",
-    "colorPipeline": "VaeDriftMatch hard-restores original pixels outside the selection (zero VAE drift there). SeamlessTone then diffuses the surrounding low-frequency colour/brightness INTO the masked region and shifts only the generated low frequency to match it, fixing exposure/colour offset AND lighting gradients while preserving generated detail. Replaces the old global-Reinhard AreaMatch+ColorHarmonize chain, which measurably worsened the seam.",
+    "colorPipeline": "VaeDriftMatch hard-restores original pixels outside the selection (zero VAE drift there). SeamlessTone then diffuses the surrounding low-frequency colour/brightness INTO the masked region and shifts only the generated low frequency to match it, fixing exposure/colour offset AND lighting gradients while preserving generated detail. ReferenceColorLock is the final guard: drift-like pixels inside the mask are restored to the source, while changed pixels are forced through source-colour mode so their hue/saturation come from the input image and only generated value/structure remains. Replaces the old global-Reinhard AreaMatch+ColorHarmonize chain, which measurably worsened the seam.",
+    "colorLock": "Node 99 runs after GrainTransfer and before PadToDocument. lock_threshold restores low-delta masked pixels exactly to original; chroma/luma strengths control palette locking for truly changed pixels. The production hard lock now ends with source_chroma_strength=1, so source RGB channel relationships are the final invariant; source_saturation_strength=1 is an intermediate perceptual guard, not the last colour operation.",
+    "changeAlpha": "PadToDocument runs with alpha_mode=change and original_image=node 10. The result PNG is transparent anywhere the final crop matches the source, and the production workflow keeps alpha_grow/alpha_feather at 0 so Photoshop cannot tint a broad soft-mask halo.",
+    "compositeColorLock": "PadToDocument precompensates RGBA against the quantized PNG alpha so Photoshop's normal alpha blend reconstructs the locked crop colour instead of introducing a partial-alpha hue/saturation shift. Out-of-gamut partial-alpha pixels are made opaque rather than allowed to drift.",
     "tone_radius": "Gaussian sigma in px of the tone field. Plugin sets it to ~1/8 of the smaller crop dimension (about 1/4 of the selection radius).",
     "cfg": "1 recommended for FLUX models"
   }

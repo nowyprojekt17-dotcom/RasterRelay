@@ -1,0 +1,62 @@
+{
+  "prompt_id": "3a27b057-a912-4bee-848e-aa2b24e45317",
+  "result_path": "C:\\Users\\Mierz\\Desktop\\RasterRelay\\tests\\manual\\comfy-runtime\\output\\RasterRelay\\practical-suite\\gta-poster-vi-badge_00007_.png",
+  "image_meta": {
+    "filename": "gta-poster-vi-badge_00007_.png",
+    "subfolder": "RasterRelay/practical-suite",
+    "type": "output",
+    "absolute_path": "C:\\Users\\Mierz\\Desktop\\RasterRelay\\tests\\manual\\comfy-runtime\\output\\RasterRelay/practical-suite\\gta-poster-vi-badge_00007_.png",
+    "width": 256,
+    "height": 256,
+    "alpha_bbox": {
+      "left": 118,
+      "top": 144,
+      "right": 184,
+      "bottom": 208,
+      "width": 66,
+      "height": 64
+    }
+  },
+  "result_size": [
+    256,
+    256
+  ],
+  "alpha_positive_pixels": 1827,
+  "alpha_positive_percent": 2.78778076171875,
+  "alpha_bbox": {
+    "left": 118,
+    "top": 144,
+    "right": 184,
+    "bottom": 208
+  },
+  "max_diff_where_alpha_zero_after_composite": 0,
+  "max_diff_anywhere_after_composite": 138,
+  "raw_rgb_max_diff_where_alpha_zero": 0,
+  "source_chroma_max_error_where_alpha_positive_after_composite": 0,
+  "source_chroma_mean_error_where_alpha_positive_after_composite": 0.0,
+  "raw_source_chroma_max_error_where_alpha_positive": 1,
+  "source_hue_checked_pixels": 491,
+  "source_hue_skipped_low_chroma_pixels": 1336,
+  "source_hue_min_checked_delta_rgb_levels": 40,
+  "source_hue_max_error_degrees_where_alpha_positive_after_composite": 1.1444091796875e-05,
+  "source_hue_mean_error_degrees_where_alpha_positive_after_composite": 4.972314400220057e-07,
+  "raw_source_hue_max_error_degrees_where_alpha_positive": 1.5000114440917969,
+  "source_saturation_max_error_where_alpha_positive_after_composite": 0.12576067447662354,
+  "source_saturation_mean_error_where_alpha_positive_after_composite": 0.018047133460640907,
+  "raw_source_saturation_max_error_where_alpha_positive": 0.2104703187942505,
+  "composite_changed_pixels": 1827,
+  "composite_changed_percent": 2.78778076171875,
+  "case_name": "gta-poster-vi-badge",
+  "source_image": "C:\\Users\\Mierz\\Desktop\\RasterRelay\\tests\\manual\\test-images\\aa0d7431-a296-464e-9b88-a4ee2e9efc89.png",
+  "prompt": "Rework the selected VI badge into a slightly embossed printed badge integrated with the poster. Preserve the original orange, magenta and cream colour palette exactly.",
+  "negative_prompt": "hue shift, saturation shift, color cast, changed paint colour, changed fabric colour, altered unmasked area, visible seam, halo, pasted edge, washed out colour, oversaturated colour",
+  "mask_box": [
+    118,
+    144,
+    184,
+    214
+  ],
+  "mask_shape": "rect",
+  "audit_source_path": "C:\\Users\\Mierz\\Desktop\\RasterRelay\\tests\\manual\\comfy-output\\practical-suite\\gta-poster-vi-badge-audit-source.png",
+  "audit_mask_path": "C:\\Users\\Mierz\\Desktop\\RasterRelay\\tests\\manual\\comfy-output\\practical-suite\\gta-poster-vi-badge-audit-mask.png"
+}

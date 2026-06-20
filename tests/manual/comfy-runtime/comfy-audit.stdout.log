@@ -1,0 +1,84 @@
+[32m[INFO][0m setup plugin alembic.autogenerate.schemas
+[32m[INFO][0m setup plugin alembic.autogenerate.tables
+[32m[INFO][0m setup plugin alembic.autogenerate.types
+[32m[INFO][0m setup plugin alembic.autogenerate.constraints
+[32m[INFO][0m setup plugin alembic.autogenerate.defaults
+[32m[INFO][0m setup plugin alembic.autogenerate.comments
+[32m[INFO][0m Adding extra search path checkpoints E:\AI\ComfyUI\models\checkpoints
+[32m[INFO][0m Adding extra search path clip E:\AI\ComfyUI\models\clip
+[32m[INFO][0m Adding extra search path clip_vision E:\AI\ComfyUI\models\clip_vision
+[32m[INFO][0m Adding extra search path configs E:\AI\ComfyUI\models\configs
+[32m[INFO][0m Adding extra search path controlnet E:\AI\ComfyUI\models\controlnet
+[32m[INFO][0m Adding extra search path diffusers E:\AI\ComfyUI\models\diffusers
+[32m[INFO][0m Adding extra search path diffusion_models E:\AI\ComfyUI\models\diffusion_models
+[32m[INFO][0m Adding extra search path embeddings E:\AI\ComfyUI\models\embeddings
+[32m[INFO][0m Adding extra search path gligen E:\AI\ComfyUI\models\gligen
+[32m[INFO][0m Adding extra search path hypernetworks E:\AI\ComfyUI\models\hypernetworks
+[32m[INFO][0m Adding extra search path loras E:\AI\ComfyUI\models\loras
+[32m[INFO][0m Adding extra search path photomaker E:\AI\ComfyUI\models\photomaker
+[32m[INFO][0m Adding extra search path style_models E:\AI\ComfyUI\models\style_models
+[32m[INFO][0m Adding extra search path text_encoders E:\AI\ComfyUI\models\text_encoders
+[32m[INFO][0m Adding extra search path unet E:\AI\ComfyUI\models\unet
+[32m[INFO][0m Adding extra search path upscale_models E:\AI\ComfyUI\models\upscale_models
+[32m[INFO][0m Adding extra search path vae E:\AI\ComfyUI\models\vae
+[32m[INFO][0m Setting output directory to: C:\Users\Mierz\Desktop\RasterRelay\tests\manual\comfy-runtime\output
+[32m[INFO][0m Setting input directory to: C:\Users\Mierz\Desktop\RasterRelay\tests\manual\comfy-runtime\input
+[1m[33m[WARNING][0m WARNING: You need pytorch with cu130 or higher to use optimized CUDA operations.
+[32m[INFO][0m Found comfy_kitchen backend triton: {'available': False, 'disabled': True, 'unavailable_reason': "ImportError: No module named 'triton'", 'capabilities': []}
+[32m[INFO][0m Found comfy_kitchen backend cuda: {'available': True, 'disabled': True, 'unavailable_reason': None, 'capabilities': ['apply_rope', 'apply_rope1', 'apply_rope_split_half', 'apply_rope_split_half1', 'dequantize_nvfp4', 'dequantize_per_tensor_fp8', 'gemv_awq_w4a16', 'quantize_mxfp8', 'quantize_nvfp4', 'quantize_per_tensor_fp8', 'quantize_svdquant_w4a4', 'scaled_mm_nvfp4', 'scaled_mm_svdquant_w4a4', 'stochastic_rounding_fp8']}
+[32m[INFO][0m Found comfy_kitchen backend eager: {'available': True, 'disabled': False, 'unavailable_reason': None, 'capabilities': ['apply_rope', 'apply_rope1', 'apply_rope_split_half', 'apply_rope_split_half1', 'dequantize_mxfp8', 'dequantize_nvfp4', 'dequantize_per_tensor_fp8', 'gemv_awq_w4a16', 'quantize_mxfp8', 'quantize_nvfp4', 'quantize_per_tensor_fp8', 'quantize_svdquant_w4a4', 'scaled_mm_mxfp8', 'scaled_mm_nvfp4', 'scaled_mm_svdquant_w4a4', 'stochastic_rounding_fp8']}
+[32m[INFO][0m Checkpoint files will always be loaded safely.
+[32m[INFO][0m Total VRAM 24575 MB, total RAM 32693 MB
+[32m[INFO][0m pytorch version: 2.11.0+cu128
+[32m[INFO][0m Set vram state to: NORMAL_VRAM
+[32m[INFO][0m Device: cuda:0 NVIDIA GeForce RTX 3090 : cudaMallocAsync
+[32m[INFO][0m Using async weight offloading with 2 streams
+[32m[INFO][0m Enabled pinned memory 13077.0
+[32m[INFO][0m Using pytorch attention
+[32m[INFO][0m DynamicVRAM support detected and enabled
+[32m[INFO][0m Python version: 3.12.9 (tags/v3.12.9:fdb8142, Feb  4 2025, 15:27:58) [MSC v.1942 64 bit (AMD64)]
+[32m[INFO][0m ComfyUI version: 0.22.0
+[32m[INFO][0m comfy-aimdo version: 0.4.5
+[32m[INFO][0m comfy-kitchen version: 0.2.10
+[32m[INFO][0m Setting temp directory to: C:\Users\Mierz\Desktop\RasterRelay\tests\manual\comfy-runtime\temp\temp
+[32m[INFO][0m comfyui-frontend-package version: 1.44.19
+[32m[INFO][0m comfyui-workflow-templates version: 0.9.82
+[32m[INFO][0m comfyui-embedded-docs version: 0.5.1
+[32m[INFO][0m comfy-kitchen version: 0.2.10
+[32m[INFO][0m comfy-aimdo version: 0.4.5
+[32m[INFO][0m [Prompt Server] web root: E:\AI\ComfyUI\.venv\Lib\site-packages\comfyui_frontend_package\static
+[32m[INFO][0m Asset seeder disabled
+[32m[INFO][0m ComfyUI-GGUF: Allowing full torch compile
+[1m[33m[WARNING][0m OpenCV not installed
+[32m[INFO][0m 
+Import times for custom nodes:
+[32m[INFO][0m    0.0 seconds: C:\Users\Mierz\Desktop\RasterRelay\tests\manual\comfy-runtime\custom_nodes\ComfyUI-KJNodes
+[32m[INFO][0m    0.0 seconds: C:\Users\Mierz\Desktop\RasterRelay\tests\manual\comfy-runtime\custom_nodes\ComfyUI-GGUF
+[32m[INFO][0m    0.2 seconds: C:\Users\Mierz\Desktop\RasterRelay\tests\manual\comfy-runtime\custom_nodes\rasterrelay_nodes
+[32m[INFO][0m 
+[32m[INFO][0m Context impl SQLiteImpl.
+[32m[INFO][0m Will assume non-transactional DDL.
+[32m[INFO][0m Using RAM pressure cache.
+[32m[INFO][0m Starting server
+
+[32m[INFO][0m To see the GUI go to: http://127.0.0.1:8188
+[32m[INFO][0m got prompt
+[32m[INFO][0m Using pytorch attention in VAE
+[32m[INFO][0m Using pytorch attention in VAE
+[32m[INFO][0m VAE load device: cuda:0, offload device: cpu, dtype: torch.bfloat16
+[32m[INFO][0m Requested to load AutoencoderKL
+[32m[INFO][0m Model AutoencoderKL prepared for dynamic VRAM loading. 160MB Staged. 0 patches attached. Force pre-loaded 110 weights: 187 KB.
+[32m[INFO][0m Found quantization metadata version 1
+[32m[INFO][0m Using MixedPrecisionOps for text encoder
+[1m[33m[WARNING][0m Missing weight for layer model.lm_head
+[32m[INFO][0m CLIP/text encoder model load device: cuda:0, offload device: cpu, current: cpu, dtype: torch.float16
+[32m[INFO][0m gguf qtypes: F32 (80), Q5_K (36), Q4_K (76), BF16 (9)
+[32m[INFO][0m model weight dtype torch.bfloat16, manual cast: None
+[32m[INFO][0m model_type FLUX
+[32m[INFO][0m Requested to load Flux2TEModel_
+[32m[INFO][0m Model Flux2TEModel_ prepared for dynamic VRAM loading. 8262MB Staged. 0 patches attached. Force pre-loaded 145 weights: 602 KB.
+[32m[INFO][0m Model Flux2TEModel_ prepared for dynamic VRAM loading. 8262MB Staged. 0 patches attached. Force pre-loaded 145 weights: 602 KB.
+[32m[INFO][0m Requested to load Flux2
+[32m[INFO][0m loaded completely; 13282.78 MB usable, 5828.04 MB loaded, full load: True
+[32m[INFO][0m Model AutoencoderKL prepared for dynamic VRAM loading. 160MB Staged. 0 patches attached. Force pre-loaded 110 weights: 187 KB.
+[32m[INFO][0m [32mPrompt executed in 13.99 seconds[0m

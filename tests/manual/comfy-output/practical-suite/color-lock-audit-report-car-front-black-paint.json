@@ -1,0 +1,62 @@
+{
+  "prompt_id": "cc887380-f29b-4e62-b580-c1060fddf108",
+  "result_path": "C:\\Users\\Mierz\\Desktop\\RasterRelay\\tests\\manual\\comfy-runtime\\output\\RasterRelay\\practical-suite\\car-front-black-paint_00008_.png",
+  "image_meta": {
+    "filename": "car-front-black-paint_00008_.png",
+    "subfolder": "RasterRelay/practical-suite",
+    "type": "output",
+    "absolute_path": "C:\\Users\\Mierz\\Desktop\\RasterRelay\\tests\\manual\\comfy-runtime\\output\\RasterRelay/practical-suite\\car-front-black-paint_00008_.png",
+    "width": 256,
+    "height": 256,
+    "alpha_bbox": {
+      "left": 70,
+      "top": 96,
+      "right": 191,
+      "bottom": 183,
+      "width": 121,
+      "height": 87
+    }
+  },
+  "result_size": [
+    256,
+    256
+  ],
+  "alpha_positive_pixels": 5338,
+  "alpha_positive_percent": 8.1451416015625,
+  "alpha_bbox": {
+    "left": 70,
+    "top": 96,
+    "right": 191,
+    "bottom": 183
+  },
+  "max_diff_where_alpha_zero_after_composite": 0,
+  "max_diff_anywhere_after_composite": 41,
+  "raw_rgb_max_diff_where_alpha_zero": 0,
+  "source_chroma_max_error_where_alpha_positive_after_composite": 0,
+  "source_chroma_mean_error_where_alpha_positive_after_composite": 0.0,
+  "raw_source_chroma_max_error_where_alpha_positive": 1,
+  "source_hue_checked_pixels": 167,
+  "source_hue_skipped_low_chroma_pixels": 3093,
+  "source_hue_min_checked_delta_rgb_levels": 40,
+  "source_hue_max_error_degrees_where_alpha_positive_after_composite": 1.52587890625e-05,
+  "source_hue_mean_error_degrees_where_alpha_positive_after_composite": 1.6446598465336137e-06,
+  "raw_source_hue_max_error_degrees_where_alpha_positive": 0.6660614013671875,
+  "source_saturation_max_error_where_alpha_positive_after_composite": 0.056650906801223755,
+  "source_saturation_mean_error_where_alpha_positive_after_composite": 0.018669981509447098,
+  "raw_source_saturation_max_error_where_alpha_positive": 0.08058607578277588,
+  "composite_changed_pixels": 5338,
+  "composite_changed_percent": 8.1451416015625,
+  "case_name": "car-front-black-paint",
+  "source_image": "C:\\Users\\Mierz\\Desktop\\RasterRelay\\tests\\manual\\test-images\\car-color-test.jpg",
+  "prompt": "Add subtle rain droplets and glossy reflection detail on the selected front hood and grille area. Keep the black car paint colour exactly the same as the source image.",
+  "negative_prompt": "hue shift, saturation shift, color cast, changed paint colour, changed fabric colour, altered unmasked area, visible seam, halo, pasted edge, washed out colour, oversaturated colour",
+  "mask_box": [
+    70,
+    96,
+    190,
+    182
+  ],
+  "mask_shape": "ellipse",
+  "audit_source_path": "C:\\Users\\Mierz\\Desktop\\RasterRelay\\tests\\manual\\comfy-output\\practical-suite\\car-front-black-paint-audit-source.png",
+  "audit_mask_path": "C:\\Users\\Mierz\\Desktop\\RasterRelay\\tests\\manual\\comfy-output\\practical-suite\\car-front-black-paint-audit-mask.png"
+}

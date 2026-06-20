@@ -1,0 +1,53 @@
+{
+  "prompt_id": "62b0b56b-78ae-4e3d-9a29-b744bebfd20e",
+  "result_path": "C:\\Users\\Mierz\\Desktop\\RasterRelay\\tests\\manual\\comfy-runtime\\output\\RasterRelay\\source-chroma-audit_00017_.png",
+  "image_meta": {
+    "filename": "source-chroma-audit_00017_.png",
+    "subfolder": "RasterRelay",
+    "type": "output",
+    "absolute_path": "C:\\Users\\Mierz\\Desktop\\RasterRelay\\tests\\manual\\comfy-runtime\\output\\RasterRelay\\source-chroma-audit_00017_.png",
+    "width": 256,
+    "height": 256,
+    "alpha_bbox": {
+      "left": 64,
+      "top": 44,
+      "right": 146,
+      "bottom": 130,
+      "width": 82,
+      "height": 86
+    }
+  },
+  "result_size": [
+    256,
+    256
+  ],
+  "alpha_positive_pixels": 1375,
+  "alpha_positive_percent": 2.09808349609375,
+  "alpha_bbox": {
+    "left": 64,
+    "top": 44,
+    "right": 146,
+    "bottom": 130
+  },
+  "max_diff_where_alpha_zero_after_composite": 0,
+  "max_diff_anywhere_after_composite": 55,
+  "raw_rgb_max_diff_where_alpha_zero": 0,
+  "source_chroma_max_error_where_alpha_positive_after_composite": 23,
+  "source_chroma_mean_error_where_alpha_positive_after_composite": 1.6021818181818182,
+  "raw_source_chroma_max_error_where_alpha_positive": 26,
+  "source_hue_checked_pixels": 692,
+  "source_hue_skipped_low_chroma_pixels": 678,
+  "source_hue_min_checked_delta_rgb_levels": 40,
+  "source_hue_max_error_degrees_where_alpha_positive_after_composite": 1.114990234375,
+  "source_hue_mean_error_degrees_where_alpha_positive_after_composite": 0.2639235258102417,
+  "raw_source_hue_max_error_degrees_where_alpha_positive": 6.2120361328125,
+  "source_saturation_max_error_where_alpha_positive_after_composite": 0.006283432245254517,
+  "source_saturation_mean_error_where_alpha_positive_after_composite": 0.00163055001758039,
+  "raw_source_saturation_max_error_where_alpha_positive": 0.041421592235565186,
+  "composite_changed_pixels": 1375,
+  "composite_changed_percent": 2.09808349609375,
+  "case_name": "portrait-precomp",
+  "source_image": "C:\\Users\\Mierz\\Desktop\\RasterRelay\\tests\\manual\\test-images\\envato-labs-ai-da532839-090d-4b70-9e60-1ed61c2e94a5.jpg",
+  "audit_source_path": "C:\\Users\\Mierz\\Desktop\\RasterRelay\\tests\\manual\\comfy-output\\portrait-precomp-audit-source.png",
+  "audit_mask_path": "C:\\Users\\Mierz\\Desktop\\RasterRelay\\tests\\manual\\comfy-output\\portrait-precomp-audit-mask.png"
+}

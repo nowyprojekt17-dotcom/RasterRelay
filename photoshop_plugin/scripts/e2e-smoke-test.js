@@ -15,6 +15,7 @@ const TEST_CAN_MASK = {
 };
 const TEST_PROMPT =
   "replace only the can in the selected area with a small red ceramic mug held in the hand, preserve the hand, body, face, text and the rest of the image";
+const panelHelpers = globalThis.RasterRelayPanelHelpers || {};
 
 function safeTimestamp() {
   return new Date().toISOString().replace(/[:.]/g, "-");
@@ -462,13 +463,20 @@ async function waitForOutput(promptId) {
 }
 
 async function downloadOutput(image, dataFolder, prefix) {
-  const params = new URLSearchParams({
-    filename: image.filename,
-    subfolder: image.subfolder || "",
-    type: image.type || "output"
-  });
+  const absolutePath = image.absolute_path || image.absolutePath || "";
+  const params = absolutePath
+    ? new URLSearchParams({ path: absolutePath })
+    : new URLSearchParams({
+        filename: image.filename,
+        subfolder: image.subfolder || "",
+        type: image.type || "output"
+      });
 
-  const response = await fetch(`${COMFYUI_BASE_URL}/view?${params.toString()}`);
+  const response = await fetch(
+    absolutePath
+      ? `${COMFYUI_BASE_URL}/rasterrelay/view?${params.toString()}`
+      : `${COMFYUI_BASE_URL}/view?${params.toString()}`
+  );
   if (!response.ok) {
     throw new Error(`Could not download ComfyUI output: HTTP ${response.status}`);
   }
@@ -476,6 +484,224 @@ async function downloadOutput(image, dataFolder, prefix) {
   const file = await dataFolder.createFile(`${prefix}-result.png`, { overwrite: true });
   await file.write(await response.arrayBuffer());
   return file;
+}
+
+function hasValidAlphaBBox(alphaBBox) {
+  if (!alphaBBox || typeof alphaBBox !== "object") {
+    return false;
+  }
+
+  return ["left", "top", "right", "bottom"].every((key) => Number.isFinite(Number(alphaBBox[key])));
+}
+
+function shouldUsePngAlphaOnly(image) {
+  return hasValidAlphaBBox(image?.alpha_bbox || image?.alphaBBox || null);
+}
+
+async function getDocumentCompositeSnapshot(document, size) {
+  if (!photoshop.imaging?.getPixels) {
+    throw new Error("Photoshop imaging.getPixels is unavailable.");
+  }
+
+  const width = Math.round(size.width);
+  const height = Math.round(size.height);
+  const pixelResult = await photoshop.imaging.getPixels({
+    documentID: document.id,
+    sourceBounds: {
+      left: 0,
+      top: 0,
+      right: width,
+      bottom: height
+    },
+    componentSize: 8,
+    colorSpace: "RGB",
+    applyAlpha: true
+  });
+
+  try {
+    const imageData = pixelResult.imageData;
+    const data = await imageData.getData({ chunky: true });
+    const bounds = pixelResult.sourceBounds || { left: 0, top: 0, right: width, bottom: height };
+
+    return {
+      width: imageData.width,
+      height: imageData.height,
+      components: imageData.components,
+      componentSize: imageData.componentSize,
+      pixelFormat: imageData.pixelFormat,
+      sourceBounds: bounds,
+      data: new Uint8Array(data)
+    };
+  } finally {
+    pixelResult.imageData?.dispose?.();
+  }
+}
+
+function assertFullDocumentSnapshot(snapshot, size, label) {
+  const width = Math.round(size.width);
+  const height = Math.round(size.height);
+  if (snapshot.width !== width || snapshot.height !== height) {
+    throw new Error(`${label} snapshot has ${snapshot.width}x${snapshot.height}, expected ${width}x${height}.`);
+  }
+  if (snapshot.components < 3 || snapshot.componentSize !== 8) {
+    throw new Error(`${label} snapshot has unsupported format components=${snapshot.components}, componentSize=${snapshot.componentSize}.`);
+  }
+  const bounds = snapshot.sourceBounds || {};
+  if (Math.round(bounds.left || 0) !== 0 || Math.round(bounds.top || 0) !== 0) {
+    throw new Error(`${label} snapshot source bounds start at ${JSON.stringify(bounds)}, expected document origin.`);
+  }
+}
+
+function channelDifferenceTriplet(data, offset) {
+  const red = data[offset];
+  const green = data[offset + 1];
+  const blue = data[offset + 2];
+  return [red - green, red - blue, green - blue];
+}
+
+function maxSourceChromaError(beforeData, beforeOffset, afterData, afterOffset) {
+  if (panelHelpers.maxSourceChromaError) {
+    return panelHelpers.maxSourceChromaError(beforeData, beforeOffset, afterData, afterOffset);
+  }
+
+  const beforeDiffs = channelDifferenceTriplet(beforeData, beforeOffset);
+  const afterDiffs = channelDifferenceTriplet(afterData, afterOffset);
+  let maxError = 0;
+
+  for (let index = 0; index < beforeDiffs.length; index += 1) {
+    maxError = Math.max(maxError, Math.abs(beforeDiffs[index] - afterDiffs[index]));
+  }
+
+  return maxError;
+}
+
+function sourceHueError(beforeData, beforeOffset, afterData, afterOffset) {
+  if (panelHelpers.sourceHueError) {
+    return panelHelpers.sourceHueError(beforeData, beforeOffset, afterData, afterOffset);
+  }
+
+  return null;
+}
+
+function sourceSaturationError(beforeData, beforeOffset, afterData, afterOffset) {
+  if (panelHelpers.sourceSaturationError) {
+    return panelHelpers.sourceSaturationError(beforeData, beforeOffset, afterData, afterOffset);
+  }
+
+  return null;
+}
+
+function auditCompositeColorLock(beforeSnapshot, afterSnapshot, outputImage, size) {
+  const alphaBBox = outputImage?.alpha_bbox || outputImage?.alphaBBox || null;
+  if (!hasValidAlphaBBox(alphaBBox)) {
+    throw new Error("Output image did not include alpha_bbox metadata; Photoshop color-lock audit cannot run.");
+  }
+
+  assertFullDocumentSnapshot(beforeSnapshot, size, "before");
+  assertFullDocumentSnapshot(afterSnapshot, size, "after");
+
+  const width = Math.round(size.width);
+  const height = Math.round(size.height);
+  const beforeStep = beforeSnapshot.components;
+  const afterStep = afterSnapshot.components;
+  let outsideChangedPixels = 0;
+  let maxDiffOutsideAlphaBBox = 0;
+  let insideChangedPixels = 0;
+  let sourceChromaMaxErrorInsideChanged = 0;
+  let sourceChromaErrorSumInsideChanged = 0;
+  let sourceChromaCheckedPixels = 0;
+  let sourceHueMaxErrorInsideChanged = 0;
+  let sourceHueErrorSumInsideChanged = 0;
+  let sourceHueCheckedPixels = 0;
+  let sourceSaturationMaxErrorInsideChanged = 0;
+  let sourceSaturationErrorSumInsideChanged = 0;
+  let sourceSaturationCheckedPixels = 0;
+
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const beforeOffset = (y * width + x) * beforeStep;
+      const afterOffset = (y * width + x) * afterStep;
+      let diff = 0;
+
+      for (let channel = 0; channel < 3; channel += 1) {
+        diff = Math.max(diff, Math.abs(beforeSnapshot.data[beforeOffset + channel] - afterSnapshot.data[afterOffset + channel]));
+      }
+
+      const insideAlphaBBox =
+        x >= alphaBBox.left &&
+        x < alphaBBox.right &&
+        y >= alphaBBox.top &&
+        y < alphaBBox.bottom;
+
+      if (insideAlphaBBox) {
+        if (diff > 0) {
+          insideChangedPixels += 1;
+          const chromaError = maxSourceChromaError(
+            beforeSnapshot.data,
+            beforeOffset,
+            afterSnapshot.data,
+            afterOffset
+          );
+          sourceChromaMaxErrorInsideChanged = Math.max(sourceChromaMaxErrorInsideChanged, chromaError);
+          sourceChromaErrorSumInsideChanged += chromaError;
+          sourceChromaCheckedPixels += 1;
+          const hueError = sourceHueError(
+            beforeSnapshot.data,
+            beforeOffset,
+            afterSnapshot.data,
+            afterOffset
+          );
+          if (hueError !== null) {
+            sourceHueMaxErrorInsideChanged = Math.max(sourceHueMaxErrorInsideChanged, hueError);
+            sourceHueErrorSumInsideChanged += hueError;
+            sourceHueCheckedPixels += 1;
+          }
+          const saturationError = sourceSaturationError(
+            beforeSnapshot.data,
+            beforeOffset,
+            afterSnapshot.data,
+            afterOffset
+          );
+          if (saturationError !== null) {
+            sourceSaturationMaxErrorInsideChanged = Math.max(sourceSaturationMaxErrorInsideChanged, saturationError);
+            sourceSaturationErrorSumInsideChanged += saturationError;
+            sourceSaturationCheckedPixels += 1;
+          }
+        }
+      } else if (diff > 0) {
+        outsideChangedPixels += 1;
+        maxDiffOutsideAlphaBBox = Math.max(maxDiffOutsideAlphaBBox, diff);
+      }
+    }
+  }
+
+  return {
+    checked: true,
+    alphaBBox,
+    outsideChangedPixels,
+    maxDiffOutsideAlphaBBox,
+    insideChangedPixels,
+    sourceChromaCheckedPixels,
+    sourceChromaMaxErrorInsideChanged,
+    sourceChromaMeanErrorInsideChanged: sourceChromaCheckedPixels
+      ? sourceChromaErrorSumInsideChanged / sourceChromaCheckedPixels
+      : 0,
+    sourceHueCheckedPixels,
+    sourceHueMaxErrorInsideChanged,
+    sourceHueMeanErrorInsideChanged: sourceHueCheckedPixels
+      ? sourceHueErrorSumInsideChanged / sourceHueCheckedPixels
+      : 0,
+    sourceSaturationCheckedPixels,
+    sourceSaturationMaxErrorInsideChanged,
+    sourceSaturationMeanErrorInsideChanged: sourceSaturationCheckedPixels
+      ? sourceSaturationErrorSumInsideChanged / sourceSaturationCheckedPixels
+      : 0,
+    passed:
+      outsideChangedPixels === 0 &&
+      maxDiffOutsideAlphaBBox === 0 &&
+      sourceChromaMaxErrorInsideChanged <= 1 &&
+      (sourceHueCheckedPixels === 0 || sourceHueMaxErrorInsideChanged <= 1.5)
+  };
 }
 
 async function applySoftCanMaskToActiveLayer(size) {
@@ -538,9 +764,10 @@ async function clearActiveSelection() {
   );
 }
 
-async function placeResultAsLayer(file, size) {
+async function placeResultAsLayer(file, size, outputImage) {
   const token = await uxp.storage.localFileSystem.createSessionToken(file);
   let layerMask;
+  const usePngAlphaOnly = shouldUsePngAlphaOnly(outputImage);
 
   await photoshop.core.executeAsModal(
     async () => {
@@ -563,7 +790,14 @@ async function placeResultAsLayer(file, size) {
         ],
         {}
       );
-      layerMask = await applySoftCanMaskToActiveLayer(size);
+      layerMask = usePngAlphaOnly
+        ? {
+            applied: false,
+            skipped: true,
+            source: "png-change-alpha",
+            reason: "ComfyUI result carries exact change alpha; Photoshop layer mask was intentionally skipped."
+          }
+        : await applySoftCanMaskToActiveLayer(size);
     },
     { commandName: "RasterRelay E2E Place Result" }
   );
@@ -582,6 +816,7 @@ async function runRasterRelayE2ESmokeTest() {
     width: getUnitValue(document.width),
     height: getUnitValue(document.height)
   };
+  const beforePlacementComposite = await getDocumentCompositeSnapshot(document, size);
 
   const sourceFile = await exportDocumentPng(document, dataFolder, prefix);
   const maskFile = await createMaskPng(dataFolder, prefix, size);
@@ -592,7 +827,15 @@ async function runRasterRelayE2ESmokeTest() {
   const promptId = await queueWorkflow(workflow);
   const outputImage = await waitForOutput(promptId);
   const resultFile = await downloadOutput(outputImage, dataFolder, prefix);
-  const placement = await placeResultAsLayer(resultFile, size);
+  const placement = await placeResultAsLayer(resultFile, size, outputImage);
+  const afterPlacementComposite = await getDocumentCompositeSnapshot(document, size);
+  const compositeAudit = auditCompositeColorLock(beforePlacementComposite, afterPlacementComposite, outputImage, size);
+
+  if (!compositeAudit.passed) {
+    throw new Error(
+      `RasterRelay E2E color-lock audit failed: outsideChanged=${compositeAudit.outsideChangedPixels}, outsideMaxDiff=${compositeAudit.maxDiffOutsideAlphaBBox}, sourceChromaMaxError=${compositeAudit.sourceChromaMaxErrorInsideChanged}, sourceHueMaxError=${compositeAudit.sourceHueMaxErrorInsideChanged}, sourceHueChecked=${compositeAudit.sourceHueCheckedPixels}, sourceSaturationMaxError=${compositeAudit.sourceSaturationMaxErrorInsideChanged}, sourceSaturationChecked=${compositeAudit.sourceSaturationCheckedPixels}`
+    );
+  }
 
   const summary = {
     ok: true,
@@ -606,8 +849,12 @@ async function runRasterRelayE2ESmokeTest() {
     mask: maskFile.nativePath || maskFile.name,
     result: resultFile.nativePath || resultFile.name,
     placement,
+    compositeAudit,
     target: TEST_CAN_MASK
   };
+  const reportFile = await dataFolder.createFile(`${prefix}-summary.json`, { overwrite: true });
+  summary.report = reportFile.nativePath || reportFile.name;
+  await reportFile.write(JSON.stringify(summary, null, 2));
 
   console.log(JSON.stringify(summary));
   return summary;

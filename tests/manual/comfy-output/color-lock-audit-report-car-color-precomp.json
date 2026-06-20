@@ -1,0 +1,53 @@
+{
+  "prompt_id": "116f56fd-6dcc-48ea-9e86-a4cce3bcb4b4",
+  "result_path": "C:\\Users\\Mierz\\Desktop\\RasterRelay\\tests\\manual\\comfy-runtime\\output\\RasterRelay\\source-chroma-audit_00016_.png",
+  "image_meta": {
+    "filename": "source-chroma-audit_00016_.png",
+    "subfolder": "RasterRelay",
+    "type": "output",
+    "absolute_path": "C:\\Users\\Mierz\\Desktop\\RasterRelay\\tests\\manual\\comfy-runtime\\output\\RasterRelay\\source-chroma-audit_00016_.png",
+    "width": 256,
+    "height": 256,
+    "alpha_bbox": {
+      "left": 92,
+      "top": 104,
+      "right": 185,
+      "bottom": 197,
+      "width": 93,
+      "height": 93
+    }
+  },
+  "result_size": [
+    256,
+    256
+  ],
+  "alpha_positive_pixels": 6682,
+  "alpha_positive_percent": 10.1959228515625,
+  "alpha_bbox": {
+    "left": 92,
+    "top": 104,
+    "right": 185,
+    "bottom": 197
+  },
+  "max_diff_where_alpha_zero_after_composite": 0,
+  "max_diff_anywhere_after_composite": 59,
+  "raw_rgb_max_diff_where_alpha_zero": 0,
+  "source_chroma_max_error_where_alpha_positive_after_composite": 52,
+  "source_chroma_mean_error_where_alpha_positive_after_composite": 2.6119425321759953,
+  "raw_source_chroma_max_error_where_alpha_positive": 52,
+  "source_hue_checked_pixels": 234,
+  "source_hue_skipped_low_chroma_pixels": 3778,
+  "source_hue_min_checked_delta_rgb_levels": 40,
+  "source_hue_max_error_degrees_where_alpha_positive_after_composite": 1.2337646484375,
+  "source_hue_mean_error_degrees_where_alpha_positive_after_composite": 0.3012818694114685,
+  "raw_source_hue_max_error_degrees_where_alpha_positive": 11.94830322265625,
+  "source_saturation_max_error_where_alpha_positive_after_composite": 0.006003469228744507,
+  "source_saturation_mean_error_where_alpha_positive_after_composite": 0.0018768419977277517,
+  "raw_source_saturation_max_error_where_alpha_positive": 0.05720183253288269,
+  "composite_changed_pixels": 6682,
+  "composite_changed_percent": 10.1959228515625,
+  "case_name": "car-color-precomp",
+  "source_image": "C:\\Users\\Mierz\\Desktop\\RasterRelay\\tests\\manual\\test-images\\car-color-test.jpg",
+  "audit_source_path": "C:\\Users\\Mierz\\Desktop\\RasterRelay\\tests\\manual\\comfy-output\\car-color-precomp-audit-source.png",
+  "audit_mask_path": "C:\\Users\\Mierz\\Desktop\\RasterRelay\\tests\\manual\\comfy-output\\car-color-precomp-audit-mask.png"
+}
