@@ -1,8 +1,18 @@
+import functools
 import os
 import tempfile
 import torch
 import numpy as np
 from PIL import Image
+
+# sRGB ICC tagging is best-effort: if a minimal PIL build lacks ImageCms the node
+# still saves (just without the iCCP chunk), exactly as before.
+try:
+    from PIL import ImageCms
+    _IMAGECMS_AVAILABLE = True
+except Exception:  # pragma: no cover - environment-dependent
+    ImageCms = None
+    _IMAGECMS_AVAILABLE = False
 
 # ComfyUI modules - optional imports for testing
 try:
@@ -11,6 +21,24 @@ try:
 except ImportError:
     COMFYUI_AVAILABLE = False
     folder_paths = None
+
+
+@functools.lru_cache(maxsize=1)
+def _srgb_icc_bytes():
+    """Standard sRGB ICC profile bytes for the PNG iCCP chunk.
+
+    We only TAG the pixels as sRGB; no pixel values change. The RasterRelay
+    pipeline and the FLUX model already work in sRGB, so the result is sRGB - it
+    was just untagged. Embedding the profile lets Photoshop convert the result
+    into a wide-gamut document's space (Adobe RGB / ProPhoto) on placement
+    instead of misreading the untagged RGB as the document profile (tonal drift).
+    """
+    if not _IMAGECMS_AVAILABLE:
+        return None
+    try:
+        return ImageCms.ImageCmsProfile(ImageCms.createProfile("sRGB")).tobytes()
+    except Exception:  # pragma: no cover - environment-dependent
+        return None
 
 
 class RasterRelaySaveImage:
@@ -115,6 +143,11 @@ class RasterRelaySaveImage:
         if images.dim() == 3:
             images = images.unsqueeze(0)
 
+        png_kwargs = {"format": "PNG", "compress_level": 6}
+        icc = _srgb_icc_bytes()
+        if icc:
+            png_kwargs["icc_profile"] = icc
+
         counter = 0
         results = []
 
@@ -134,7 +167,7 @@ class RasterRelaySaveImage:
                 full_path = os.path.join(output_dir, file_name)
 
             try:
-                pil_image.save(full_path, format="PNG", compress_level=6)
+                pil_image.save(full_path, **png_kwargs)
                 absolute_path = full_path
             except OSError:
                 output_dir, subfolder, filename_prefix_text = self._fallback_target(filename_prefix)
@@ -144,7 +177,7 @@ class RasterRelaySaveImage:
                     counter += 1
                     file_name = f"{filename_prefix_text}_{counter:05d}_.png"
                     full_path = os.path.join(output_dir, file_name)
-                pil_image.save(full_path, format="PNG", compress_level=6)
+                pil_image.save(full_path, **png_kwargs)
                 absolute_path = full_path
 
             results.append({

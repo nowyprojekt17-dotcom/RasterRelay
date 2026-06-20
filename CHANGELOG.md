@@ -27,12 +27,22 @@ a ten projekt adheres to [Semantic Versioning](https://semver.org/lang/pl/).
 - **Jedna robocza rozdzielczość generacji** (14/15/21/62 = node 16): koniec
   mieszanki 1024² (generacja) vs 1024×768 (skala/crop) i dystorsji proporcji;
   węzły koloru/szwu dostają oba obrazy w tym samym rozmiarze.
-- **sRGB po stronie Photoshopa** (`panel.js`): kopia eksportowa konwertowana do
+- **ICC kierunek „na zewnątrz"** (`panel.js`): kopia eksportowa konwertowana do
   sRGB przed `saveAs.png`. Niezgodność profilu (np. dokument Adobe RGB / P3
   czytany przez ComfyUI jako sRGB) dawała dryf tonalny identyczny ze szwem,
   niezależny od ComfyUI. Konwersja tylko na kopii; dokument użytkownika
-  nietknięty; sRGB→sRGB to no-op. Dla dokładnego round-tripu dokument roboczy
-  powinien być w sRGB (wynikowy PNG jest bez tagu ICC).
+  nietknięty; sRGB→sRGB to no-op.
+- **ICC kierunek „do środka"** — domknięty. `RasterRelaySaveImage` osadza teraz
+  w PNG tag sRGB (chunk iCCP, profil z `PIL.ImageCms`), więc Photoshop konwertuje
+  wynik do przestrzeni dokumentu wide-gamut zamiast błędnie interpretować
+  nietagowany RGB jako profil dokumentu. **Tylko oznaczenie — piksele bez zmian.**
+  Belt-and-suspenders w `placeImageFileAsLayer`: odczyt profilu dokumentu (log do
+  metadanych placement/joba) i fallback — dla dokumentu nie-sRGB wymuszenie sRGB
+  na wstawionym smart obiekcie (po `placeEvent`), w pełni izolowany (nigdy nie
+  rzuca, zawsze wraca do dokumentu źródłowego). Ścieżka sRGB pozostaje no-opem.
+  Zweryfikowane end-to-end: realny wynik ComfyUI ma chunk iCCP (588 B „sRGB"),
+  RGBA i alfę 0/255. Nowy test: `save_image_rgba_test.py`
+  (`test_saved_png_is_tagged_srgb_and_preserves_alpha`).
 - **Presety jakości** różnią się już tylko liczbą kroków (8/14/20); usunięto
   nieistniejący „refine" z etykiet i logiki (`panel-helpers.js`).
 - **Pomiar:** `audit-color-lock-workflow.py` raportuje teraz deltę szwu

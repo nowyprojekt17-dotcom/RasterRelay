@@ -86,3 +86,51 @@ def test_alpha_bbox_is_none_for_fully_transparent_rgba():
     array = module.np.zeros((8, 10, 4), dtype=module.np.uint8)
 
     assert module.RasterRelaySaveImage._alpha_bbox(array) is None
+
+
+def test_saved_png_is_tagged_srgb_and_preserves_alpha(tmp_path, monkeypatch):
+    module = load_save_image()
+
+    icc = module._srgb_icc_bytes()
+    assert icc, "ImageCms sRGB profile unavailable - cannot tag the PNG as sRGB"
+
+    class FakeFolderPaths:
+        @staticmethod
+        def get_output_directory():
+            return str(tmp_path)
+
+    monkeypatch.setattr(module, "folder_paths", FakeFolderPaths())
+
+    torch = module.torch
+    np = module.np
+    # BHWC RGBA image: red fill, alpha visible only in an inner box.
+    image = torch.zeros((1, 4, 5, 4), dtype=torch.float32)
+    image[0, :, :, 0] = 1.0            # R = 255 everywhere
+    image[0, 1:3, 1:4, 3] = 1.0        # alpha = 255 in a 2x3 box, else 0
+
+    result = module.RasterRelaySaveImage().save(image, "RasterRelay/icc-test")
+    path = Path(result["ui"]["images"][0]["absolute_path"])
+
+    raw = path.read_bytes()
+    idat = raw.index(b"IDAT")
+    assert b"iCCP" in raw[:idat], "sRGB iCCP chunk must be written before IDAT"
+
+    from PIL import Image as PILImage
+
+    with PILImage.open(path) as reopened:
+        assert reopened.mode == "RGBA", "alpha channel must survive the save"
+        assert reopened.info.get("icc_profile"), "PNG must carry an embedded ICC profile"
+        saved = np.array(reopened)
+
+    expected_alpha = (image[0, :, :, 3].numpy() * 255).round().astype(np.uint8)
+    assert (saved[..., 3] == expected_alpha).all(), "alpha channel corrupted by ICC tagging"
+    # Tag only - pixel values must be identical (no colour conversion).
+    assert (saved[..., 0] == 255).all(), "RGB pixels changed; tagging must not convert pixels"
+
+
+if __name__ == "__main__":
+    import sys
+
+    import pytest
+
+    sys.exit(pytest.main([__file__, "-q"]))

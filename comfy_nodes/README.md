@@ -20,7 +20,7 @@ experiments but are not in the default graph.
 | `RasterRelaySeamlessTone` | Bezszwowe dopasowanie tonu przy szwie (dyfuzja LF, tryb full) |
 | `RasterRelayReferenceColorLock` | Wymusza hue/saturację/relacje kanałów źródła na zmienionych pikselach (lock palety) |
 | `RasterRelayPadToDocument` | Skaluje/wkleja wynik do rozmiaru dokumentu z alfą |
-| `RasterRelaySaveImage` | Zapis PNG z kanałem alfa |
+| `RasterRelaySaveImage` | Zapis PNG z kanałem alfa + osadzony tag sRGB (iCCP) |
 
 Kolejność w workflow (zmierzony minimalny łańcuch — patrz CHANGELOG):
 
@@ -34,6 +34,14 @@ gen(DifferentialDiffusion) -> VAEDecode -> [skala→natywna]
 Generacja i `[skala→natywna]` (node 16) używają jednej roboczej rozdzielczości,
 więc węzły koloru/szwu zawsze dostają `original_image` i `generated_image` w tym
 samym rozmiarze i wyrównaniu (brak mieszanki 1024² vs aspekt cropu).
+
+**ICC / sRGB:** `RasterRelaySaveImage` osadza w PNG profil sRGB (chunk iCCP) —
+piksele NIE są konwertowane, to tylko poprawne oznaczenie przestrzeni. Dzięki
+temu Photoshop konwertuje wynik do profilu dokumentu (Adobe RGB / ProPhoto)
+zamiast błędnie interpretować nietagowany RGB jako profil dokumentu (dryf
+tonalny). Eksport źródła jest przypięty do sRGB po stronie pluginu
+(`panel.js: convertExportDocumentToSrgb`); plugin ma też fallback, który dla
+dokumentu wide-gamut wymusza sRGB na wstawionym smart obiekcie.
 
 ### Library (nie w domyślnym workflow)
 

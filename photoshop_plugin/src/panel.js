@@ -2333,6 +2333,105 @@ async function alignLayerToExpectedBounds(activeLayer, placementGeometry) {
   return actual;
 }
 
+// Read the active document's ICC colour profile name (e.g. "sRGB IEC61966-2.1",
+// "Adobe RGB (1998)", "ProPhoto RGB"). Returns null if it cannot be read.
+async function getActiveDocumentColorProfile(photoshop) {
+  try {
+    const [desc] = await photoshop.action.batchPlay(
+      [
+        {
+          _obj: "get",
+          _target: [
+            { _property: "profile" },
+            { _ref: "document", _enum: "ordinal", _value: "targetEnum" }
+          ]
+        }
+      ],
+      { synchronousExecution: true }
+    );
+    return desc?.profile ?? null;
+  } catch (error) {
+    console.warn(`[RasterRelay] Nie udało się odczytać profilu koloru dokumentu: ${error}`);
+    return null;
+  }
+}
+
+function isSrgbProfileName(name) {
+  return typeof name === "string" && /srgb/i.test(name);
+}
+
+// ICC inward direction (belt-and-suspenders). The result PNG is already tagged
+// sRGB at the source (RasterRelaySaveImage embeds an iCCP chunk), so Photoshop
+// converts it into the document space on placement. This is a fallback for the
+// case where that tag is missing/stripped AND the document is wide-gamut: we
+// reinterpret the placed smart object's contents as sRGB so Photoshop converts
+// them to the document profile instead of assigning the document profile to
+// untagged RGB (which would drift tone exactly like a seam). Fully contained:
+// it never throws and always restores the original document as active. The sRGB
+// path is an explicit no-op so the common case is never touched.
+async function ensurePlacedResultColorSpace(photoshop, placement) {
+  let documentProfile = null;
+  let action = "none";
+  let detail = null;
+
+  await photoshop.core.executeAsModal(
+    async () => {
+      documentProfile = await getActiveDocumentColorProfile(photoshop);
+      placement.documentColorProfile = documentProfile;
+
+      if (documentProfile == null) {
+        action = "unknown-profile-noop";
+        return;
+      }
+      if (isSrgbProfileName(documentProfile)) {
+        action = "srgb-noop";
+        return;
+      }
+
+      const originalDocId = photoshop.app.activeDocument?.id;
+      let editingOpened = false;
+      try {
+        await photoshop.action.batchPlay(
+          [{ _obj: "placedLayerEditContents", _options: { dialogOptions: "dontDisplay" } }],
+          { synchronousExecution: true }
+        );
+        editingOpened = true;
+        await photoshop.action.batchPlay(
+          [
+            {
+              _obj: "assignProfile",
+              to: { _obj: "profile", profile: "sRGB IEC61966-2.1" },
+              _options: { dialogOptions: "dontDisplay" }
+            }
+          ],
+          { synchronousExecution: true }
+        );
+        await photoshop.app.activeDocument.save();
+        action = "assigned-srgb-on-smart-object";
+      } catch (innerError) {
+        action = "fallback-failed-relying-on-embedded-tag";
+        detail = String(innerError);
+        console.warn(`[RasterRelay] Fallback sRGB na smart obiekcie nie powiódł się; polegam na tagu iCCP z węzła zapisu: ${innerError}`);
+      } finally {
+        // Always return to the source document so later steps don't act on the
+        // smart-object editing tab. The SO change (if any) was already saved.
+        try {
+          const current = photoshop.app.activeDocument;
+          if (editingOpened && current && current.id !== originalDocId) {
+            await current.closeWithoutSaving();
+          }
+        } catch (closeError) {
+          console.warn(`[RasterRelay] Nie udało się zamknąć kontekstu edycji smart obiektu: ${closeError}`);
+        }
+      }
+    },
+    { commandName: "RasterRelay Ensure Result sRGB" }
+  );
+
+  console.log(`[RasterRelay] Profil dokumentu: ${documentProfile ?? "nieznany"}; ICC inward: ${action}`);
+  return { documentProfile, action, detail };
+}
+
 async function placeImageFileAsLayer(file, layerName = "RasterRelay - wynik", layerMaskData = null, outputMetadata = {}) {
   const photoshop = getPhotoshopApi();
   const uxp = getUxpApi();
@@ -2438,6 +2537,15 @@ async function placeImageFileAsLayer(file, layerName = "RasterRelay - wynik", la
     },
     { commandName: "RasterRelay Place Result Layer" }
   );
+
+  // Close the ICC inward direction: detect the document profile, log it into the
+  // placement metadata, and (only for wide-gamut docs) re-assert sRGB on the
+  // placed result as a fallback to the embedded iCCP tag.
+  placement.colorManagement = await ensurePlacedResultColorSpace(photoshop, placement).catch((error) => ({
+    documentProfile: placement.documentColorProfile ?? null,
+    action: "error",
+    detail: String(error)
+  }));
 
   return placement;
 }
@@ -2961,6 +3069,8 @@ async function receiveComfyResult(promptId, dataFolder, cropBounds, layerMaskDat
       layerId: placement.layerId,
       layerMask: placement.layerMask,
       placementGeometry: placement.geometry,
+      documentColorProfile: placement.documentColorProfile ?? null,
+      colorManagement: placement.colorManagement ?? null,
       compositeAudit
     };
     downloaded.asset.placementGeometry = placement.geometry;
