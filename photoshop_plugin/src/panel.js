@@ -1024,36 +1024,21 @@ async function removeOptionalPluginFile(relativePath) {
   }
 }
 
-// Normalize the (throwaway) export duplicate to sRGB before saving the PNG.
-// The FLUX model and the RasterRelay colour nodes assume sRGB. If the user's
-// working space is Adobe RGB / Display P3 / ProPhoto, exporting its raw pixel
-// numbers as an sRGB-interpreted PNG shifts tone/colour independently of
-// ComfyUI - the exact "stitch" drift we are chasing. Converting here pins the
-// pipeline to sRGB. sRGB -> sRGB is a no-op, so sRGB documents are unaffected,
-// and the user's original document is never touched (this runs on the copy).
-// NOTE: for a numerically exact round trip the working document should be sRGB,
-// because the untagged ComfyUI result is re-assigned the document profile on
-// placement (Photoshop does not convert an untagged file). See CHANGELOG.
-async function convertExportDocumentToSrgb(photoshop) {
-  try {
-    await photoshop.action.batchPlay(
-      [
-        {
-          _obj: "convertToProfile",
-          to: { _obj: "profile", profile: "sRGB IEC61966-2.1" },
-          intent: { _enum: "intent", _value: "relativeColorimetric" },
-          blackPointCompensation: true,
-          dither: true,
-          _options: { dialogOptions: "dontDisplay" }
-        }
-      ],
-      { synchronousExecution: true }
-    );
-    return true;
-  } catch (error) {
-    console.warn(`[RasterRelay] convertToProfile sRGB failed; exporting in the document profile. ${error}`);
-    return false;
-  }
+// Best-effort outward ICC guard. The FLUX model and RasterRelay colour nodes
+// assume sRGB, but Photoshop Beta can reject the Convert-to-Profile action for
+// the temporary export document with a blocking modal. Therefore export-side
+// conversion is intentionally disabled here rather than breaking generation. The
+// load-bearing inward fix is in RasterRelaySaveImage: every result PNG is tagged
+// with an sRGB iCCP profile, and placeImageFileAsLayer records/fallbacks the
+// document profile on placement.
+async function convertExportDocumentToSrgb(_photoshop) {
+  // Photoshop Beta can report "Convert to Profile is not currently available"
+  // as a blocking modal from batchPlay, even when the promise is caught. Do not
+  // block generation for this best-effort guard. The inward path is now closed at
+  // the source: RasterRelaySaveImage embeds an sRGB iCCP tag in every result PNG,
+  // and placeImageFileAsLayer logs/fallbacks wide-gamut placement.
+  console.warn("[RasterRelay] Pomijam konwersję eksportowej kopii do sRGB: Photoshop zgłasza tę komendę jako niedostępną w części konfiguracji.");
+  return false;
 }
 
 async function exportCroppedSourcePng(document, dataFolder, filePrefix, paddedBounds) {

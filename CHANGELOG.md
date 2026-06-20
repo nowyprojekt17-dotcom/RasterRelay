@@ -34,11 +34,11 @@ a ten projekt adheres to [Semantic Versioning](https://semver.org/lang/pl/).
 - **Jedna robocza rozdzielczość generacji** (14/15/21/62 = node 16): koniec
   mieszanki 1024² (generacja) vs 1024×768 (skala/crop) i dystorsji proporcji;
   węzły koloru/szwu dostają oba obrazy w tym samym rozmiarze.
-- **ICC kierunek „na zewnątrz"** (`panel.js`): kopia eksportowa konwertowana do
-  sRGB przed `saveAs.png`. Niezgodność profilu (np. dokument Adobe RGB / P3
-  czytany przez ComfyUI jako sRGB) dawała dryf tonalny identyczny ze szwem,
-  niezależny od ComfyUI. Konwersja tylko na kopii; dokument użytkownika
-  nietknięty; sRGB→sRGB to no-op.
+- **ICC kierunek „na zewnątrz"** (`panel.js`): konwersja eksportowej kopii do
+  sRGB została zdegradowana do bezpiecznego no-opu, bo Photoshop Beta potrafi
+  zgłosić „Konwersja do profilu nie jest aktualnie dostępna" jako modalny błąd
+  mimo `batchPlay`. Nie blokujemy generacji dla tej best-effort osłony; właściwe
+  domknięcie profilu robi tag sRGB iCCP na wynikowym PNG + fallback placementu.
 - **ICC kierunek „do środka"** — domknięty. `RasterRelaySaveImage` osadza teraz
   w PNG tag sRGB (chunk iCCP, profil z `PIL.ImageCms`), więc Photoshop konwertuje
   wynik do przestrzeni dokumentu wide-gamut zamiast błędnie interpretować
