@@ -15,7 +15,9 @@ a ten projekt adheres to [Semantic Versioning](https://semver.org/lang/pl/).
   więc snapshot przed/po kompozycji jest teraz pobierany przez `executeAsModal`
   (`RasterRelay Pixel Audit Snapshot`). Bez tego wtyczka pobierała wynik z
   ComfyUI, ale odmawiała wstawienia warstwy: „The requested functionality is only
-  allowed from inside a modal scope".
+  allowed from inside a modal scope". Próg `sourceChromaMax` poluzowany z 1 do
+  2 poziomów RGB (dalej poza maską musi być 0) — realny Photoshop/ICC daje
+  zaokrąglenie 2/255 przy poprawnym locku.
 - **Start ComfyUI z terminalem**: release launcher działa jako aplikacja GUI bez
   własnej konsoli (`windows_subsystem = "windows"`), więc `CREATE_NEW_CONSOLE` +
   `Stdio::inherit()` dawało puste/znikające okno. Ścieżka terminalowa uruchamia

@@ -623,7 +623,7 @@ function auditCompositeColorLock(beforeSnapshot, afterSnapshot, outputMetadata, 
     passed:
       outsideChangedPixels === 0 &&
       maxDiffOutsideAlphaBBox === 0 &&
-      sourceChromaMaxErrorInsideChanged <= 1 &&
+      sourceChromaMaxErrorInsideChanged <= 2 &&
       (sourceHueCheckedPixels === 0 || sourceHueMaxErrorInsideChanged <= 1.5)
   };
   }

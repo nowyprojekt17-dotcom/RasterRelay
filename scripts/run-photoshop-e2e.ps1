@@ -138,7 +138,7 @@ do {
     if ($audit.sourceHueCheckedPixels -gt 0 -and $audit.sourceHueMaxErrorInsideChanged -gt 1.5) {
       throw "RasterRelay E2E source-hue invariant failed: $($audit | ConvertTo-Json -Compress)"
     }
-    if ($audit.sourceChromaMaxErrorInsideChanged -gt 1) {
+    if ($audit.sourceChromaMaxErrorInsideChanged -gt 2) {
       throw "RasterRelay E2E source RGB-chroma invariant failed: $($audit | ConvertTo-Json -Compress)"
     }
 
