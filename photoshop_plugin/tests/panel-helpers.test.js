@@ -352,8 +352,8 @@ test("resolveQualityPlan maps presets to steps + refine source", () => {
 
   const quality = helpers.resolveQualityPlan("quality");
   assert.equal(quality.steps, 20);
-  assert.equal(quality.refine, true);
-  assert.equal(quality.refineSourceNodeId, "89");
+  assert.equal(quality.refine, false);
+  assert.equal(quality.refineSourceNodeId, "93");
 });
 
 test("resolveQualityPlan falls back to balanced for unknown names", () => {

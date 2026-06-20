@@ -45,9 +45,9 @@ function buildQualityPreset(name, label) {
 }
 
 const qualityPresets = {
-  fast: buildQualityPreset("fast", "Szybki (bez refine)"),
-  balanced: buildQualityPreset("balanced", "Dobra jakość"),
-  quality: buildQualityPreset("quality", "Maks (refine)")
+  fast: buildQualityPreset("fast", "Szybki (8 kroków)"),
+  balanced: buildQualityPreset("balanced", "Dobra jakość (14 kroków)"),
+  quality: buildQualityPreset("quality", "Maks (20 kroków)")
 };
 
 let ui = null;
@@ -81,9 +81,9 @@ const panelMarkup = `
 
       <label for="qualitySelectVisible">Jakość</label>
       <select id="qualitySelectVisible">
-        <option value="fast">Szybki — bez refine, najszybszy</option>
-        <option value="balanced" selected>Dobra jakość — zalecane</option>
-        <option value="quality">Maks — refine, najgładszy szew</option>
+        <option value="fast">Szybki — 8 kroków, najszybszy</option>
+        <option value="balanced" selected>Dobra jakość — 14 kroków, zalecane</option>
+        <option value="quality">Maks — 20 kroków, najgładszy</option>
       </select>
     </section>
 
@@ -1024,6 +1024,38 @@ async function removeOptionalPluginFile(relativePath) {
   }
 }
 
+// Normalize the (throwaway) export duplicate to sRGB before saving the PNG.
+// The FLUX model and the RasterRelay colour nodes assume sRGB. If the user's
+// working space is Adobe RGB / Display P3 / ProPhoto, exporting its raw pixel
+// numbers as an sRGB-interpreted PNG shifts tone/colour independently of
+// ComfyUI - the exact "stitch" drift we are chasing. Converting here pins the
+// pipeline to sRGB. sRGB -> sRGB is a no-op, so sRGB documents are unaffected,
+// and the user's original document is never touched (this runs on the copy).
+// NOTE: for a numerically exact round trip the working document should be sRGB,
+// because the untagged ComfyUI result is re-assigned the document profile on
+// placement (Photoshop does not convert an untagged file). See CHANGELOG.
+async function convertExportDocumentToSrgb(photoshop) {
+  try {
+    await photoshop.action.batchPlay(
+      [
+        {
+          _obj: "convertToProfile",
+          to: { _obj: "profile", profile: "sRGB IEC61966-2.1" },
+          intent: { _enum: "intent", _value: "relativeColorimetric" },
+          blackPointCompensation: true,
+          dither: true,
+          _options: { dialogOptions: "dontDisplay" }
+        }
+      ],
+      { synchronousExecution: true }
+    );
+    return true;
+  } catch (error) {
+    console.warn(`[RasterRelay] convertToProfile sRGB failed; exporting in the document profile. ${error}`);
+    return false;
+  }
+}
+
 async function exportCroppedSourcePng(document, dataFolder, filePrefix, paddedBounds) {
   const photoshop = getPhotoshopApi();
   if (!photoshop) {
@@ -1049,6 +1081,10 @@ async function exportCroppedSourcePng(document, dataFolder, filePrefix, paddedBo
           right: Math.round(paddedBounds.right),
           bottom: Math.round(paddedBounds.bottom)
         });
+        // Pin the exported source to sRGB so ComfyUI never misreads a wide-gamut
+        // working space as sRGB (a profile mismatch produces tonal drift that
+        // looks identical to a VAE seam). Runs on the export copy only.
+        await convertExportDocumentToSrgb(photoshop);
         await exportDocument.saveAs.png(file, { compression: 6 }, true);
       } finally {
         if (exportDocument) {

@@ -10,6 +10,36 @@ a ten projekt adheres to [Semantic Versioning](https://semver.org/lang/pl/).
 > 📋 Pełny narracyjny raport tej sesji (problem koloru, Fazy A–D, hotfixy,
 > Tier 1–3, metryki, lekcje): [`docs/raport-sesji-2026-06-12.md`](docs/raport-sesji-2026-06-12.md).
 
+### Changed (Tier 4 — pomiarowe uproszczenie łańcucha koloru)
+- **Łańcuch koloru skrócony 42 → 30 węzłów** na podstawie A/B (5 przypadków
+  krytycznych kolorystycznie, `scripts/run-practical-color-lock-suite-with-comfy.py`).
+  Nowy graf: `MaskEdgeRefine → VaeDriftMatch → ColorCalibrate →
+  SeamlessTone(full, seam-band) → ReferenceColorLock → PadToDocument`.
+- **Usunięte (zmierzony zerowy wkład):** `BackgroundPreserve`,
+  drugi `SeamlessTone(chroma)`, `GrainTransfer` oraz martwa, niepodłączona
+  („orphan") gałąź refine pass (węzły 17,18,70,71,72,73,74,88,89 — policzone,
+  nieosiągalne od `SaveImage`). Z tymi węzłami i bez nich: out-of-mask=0,
+  błąd hue/chroma w masce=0, delta szwu (excess vs źródło) równa lub niższa
+  bez nich (np. gta-badge −5.1 → −6.2; desk-can +0.97 → −1.9).
+- **`ReferenceColorLock` zostaje** — wariant minimalny (bez niego) rozjeżdżał
+  paletę: błąd chroma do **259**, hue do **173°** (z nim: 0/0). To on, a nie
+  GrainTransfer, jest nośnikiem locka palety.
+- **Jedna robocza rozdzielczość generacji** (14/15/21/62 = node 16): koniec
+  mieszanki 1024² (generacja) vs 1024×768 (skala/crop) i dystorsji proporcji;
+  węzły koloru/szwu dostają oba obrazy w tym samym rozmiarze.
+- **sRGB po stronie Photoshopa** (`panel.js`): kopia eksportowa konwertowana do
+  sRGB przed `saveAs.png`. Niezgodność profilu (np. dokument Adobe RGB / P3
+  czytany przez ComfyUI jako sRGB) dawała dryf tonalny identyczny ze szwem,
+  niezależny od ComfyUI. Konwersja tylko na kopii; dokument użytkownika
+  nietknięty; sRGB→sRGB to no-op. Dla dokładnego round-tripu dokument roboczy
+  powinien być w sRGB (wynikowy PNG jest bez tagu ICC).
+- **Presety jakości** różnią się już tylko liczbą kroków (8/14/20); usunięto
+  nieistniejący „refine" z etykiet i logiki (`panel-helpers.js`).
+- **Pomiar:** `audit-color-lock-workflow.py` raportuje teraz deltę szwu
+  (`seam_*`, ring wewnątrz vs na zewnątrz granicy maski, nadwyżka vs źródło)
+  i średnią różnicę w masce; nowe flagi `--workflow` i `--measure-only`
+  umożliwiają A/B wielu workflowów w jednym bootcie ComfyUI.
+
 ### Added (Tier 3 — porządki i dokumentacja)
 - Usunięto duplikat węzła `RasterRelayGrainInjector` (18 → 17 węzłów); 8 węzłów
   biblioteki oznaczonych `(biblioteka)` w nazwach menu ComfyUI.

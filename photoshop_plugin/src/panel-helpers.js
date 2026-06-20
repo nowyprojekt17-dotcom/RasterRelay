@@ -336,14 +336,14 @@
     return generationMaskHaloPxByQuality[quality] || generationMaskHaloPxByQuality.balanced;
   }
 
-  // Single source of truth for quality presets. `refine` toggles the Phase-B
-  // refine pass: when off, the workflow's SeamlessTone reads the base result
-  // (node 93) and ComfyUI prunes the whole refine branch (faster); when on it
-  // reads the refined result (node 89, smoothest internal blend).
+  // Single source of truth for quality presets. Presets now differ only by step
+  // count. The old Phase-B refine pass (VAE re-encode/denoise/decode) was removed
+  // after an A/B measurement showed it added no seam/colour benefit, so `refine`
+  // is always false (kept for backward compatibility of the plan shape).
   const qualityPlans = {
     fast: { steps: 8, refine: false },
     balanced: { steps: 14, refine: false },
-    quality: { steps: 20, refine: true }
+    quality: { steps: 20, refine: false }
   };
 
   function resolveQualityPlan(quality) {

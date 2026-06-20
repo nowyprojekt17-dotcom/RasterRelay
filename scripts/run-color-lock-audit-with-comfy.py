@@ -44,6 +44,7 @@ def main() -> int:
     parser.add_argument("--mask-shape", choices=["ellipse", "rect"], default="ellipse")
     parser.add_argument("--prompt", default=None)
     parser.add_argument("--negative-prompt", default=None)
+    parser.add_argument("--workflow", default=None)
     args = parser.parse_args()
 
     repo_root = Path(args.repo_root).resolve()
@@ -126,6 +127,8 @@ def main() -> int:
             audit_args.extend(["--prompt", args.prompt])
         if args.negative_prompt:
             audit_args.extend(["--negative-prompt", args.negative_prompt])
+        if args.workflow:
+            audit_args.extend(["--workflow", args.workflow])
 
         audit = subprocess.run(
             audit_args,

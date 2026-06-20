@@ -16,22 +16,24 @@ experiments but are not in the default graph.
 | `RasterRelayLoraStack` | Łańcuch LoRA z JSON |
 | `RasterRelayMaskEdgeRefine` | Maska kompozycji klei się do krawędzi obrazu (guided filter) |
 | `RasterRelayVaeDriftMatch` | Przywraca oryginalne piksele poza maską (dryf VAE/skali) |
-| `RasterRelayBackgroundPreserve` | W masce: dryf modelu → oryginał, intencja → generacja |
 | `RasterRelayColorCalibrate` | Inwersja systematycznego castu koloru modelu (intent-safe) |
-| `RasterRelaySeamlessTone` | Bezszwowe dopasowanie tonu (dyfuzja LF; tryb full + chroma) |
-| `RasterRelayGrainTransfer` | Ciągłość ziarna fotograficznego (tłumi krawędzie) |
+| `RasterRelaySeamlessTone` | Bezszwowe dopasowanie tonu przy szwie (dyfuzja LF, tryb full) |
+| `RasterRelayReferenceColorLock` | Wymusza hue/saturację/relacje kanałów źródła na zmienionych pikselach (lock palety) |
 | `RasterRelayPadToDocument` | Skaluje/wkleja wynik do rozmiaru dokumentu z alfą |
 | `RasterRelaySaveImage` | Zapis PNG z kanałem alfa |
 
-Kolejność w workflow:
+Kolejność w workflow (zmierzony minimalny łańcuch — patrz CHANGELOG):
 
 ```text
 gen(DifferentialDiffusion) -> VAEDecode -> [skala→natywna]
-  -> MaskEdgeRefine -> VaeDriftMatch -> BackgroundPreserve -> ColorCalibrate
-  -> [opcjonalny refine pass: preset Maks]
-  -> SeamlessTone(full) -> SeamlessTone(chroma) -> GrainTransfer
+  -> MaskEdgeRefine -> VaeDriftMatch -> ColorCalibrate
+  -> SeamlessTone(full, seam-band) -> ReferenceColorLock
   -> PadToDocument -> SaveImage
 ```
+
+Generacja i `[skala→natywna]` (node 16) używają jednej roboczej rozdzielczości,
+więc węzły koloru/szwu zawsze dostają `original_image` i `generated_image` w tym
+samym rozmiarze i wyrównaniu (brak mieszanki 1024² vs aspekt cropu).
 
 ### Library (nie w domyślnym workflow)
 
@@ -41,6 +43,12 @@ gen(DifferentialDiffusion) -> VAEDecode -> [skala→natywna]
 `RasterRelayEdgeHarmonize` — pomocniki i wcześniejsze podejścia do koloru.
 `AreaMatch`/`ColorHarmonize` (globalny Reinhard) zostały **zmierzone jako gorsze
 od `SeamlessTone`** i zastąpione; zostają jako materiał referencyjny.
+
+`RasterRelayBackgroundPreserve`, `RasterRelayGrainTransfer` oraz drugi przebieg
+`SeamlessTone(chroma)` były wcześniej w produkcji, ale A/B na 5 przypadkach
+krytycznych kolorystycznie pokazało **zerowy mierzalny wkład** (out-of-mask=0 i
+błąd hue/chroma w masce=0 z nimi i bez nich, delta szwu równa lub lepsza bez
+nich). Usunięte z domyślnego grafu, zostają jako biblioteka.
 
 > Po edycji dowolnego węzła uruchom `scripts/reload-rasterrelay-nodes.ps1`
 > (reinstall + restart + sprawdzenie gotowości) — węzły instalują się jako kopia.

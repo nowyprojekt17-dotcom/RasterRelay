@@ -133,7 +133,28 @@ def main() -> int:
     parser.add_argument("--timeout", type=int, default=900)
     parser.add_argument("--width", type=int, default=256)
     parser.add_argument("--height", type=int, default=256)
+    parser.add_argument(
+        "--workflows",
+        default="photoshop_plugin/workflows/inpainting-api.json",
+        help="Comma-separated workflow JSONs to A/B; each runs every case in the same ComfyUI boot.",
+    )
+    parser.add_argument(
+        "--cases",
+        default=None,
+        help="Comma-separated case names to include (default: all).",
+    )
+    parser.add_argument(
+        "--measure-only",
+        action="store_true",
+        help="Pass --measure-only to each audit so A/B data is collected without hard-failing on invariants.",
+    )
     args = parser.parse_args()
+
+    workflow_list = [w.strip() for w in args.workflows.split(",") if w.strip()]
+    selected = {c.strip() for c in args.cases.split(",")} if args.cases else None
+    cases = [c for c in PRACTICAL_CASES if (selected is None or c["name"] in selected)]
+    if not cases:
+        raise SystemExit(f"No matching cases for --cases={args.cases}")
 
     repo_root = Path(args.repo_root).resolve()
     comfy_root = Path(args.comfy_root).resolve()
@@ -146,10 +167,14 @@ def main() -> int:
     for folder in (runtime / "input", runtime / "output", runtime / "temp", runtime / "custom_nodes"):
         folder.mkdir(parents=True, exist_ok=True)
     sync_rasterrelay_nodes(repo_root, runtime)
-    suite_output = repo_root / "tests/manual/comfy-output/practical-suite"
-    suite_output.mkdir(parents=True, exist_ok=True)
-    for old_report in suite_output.glob("color-lock-audit-report-*.json"):
-        old_report.unlink()
+    ab_root = repo_root / "tests/manual/comfy-output/ab-suite"
+    variant_dirs = {}
+    for wf in workflow_list:
+        out_dir = ab_root / Path(wf).stem
+        out_dir.mkdir(parents=True, exist_ok=True)
+        for old_report in out_dir.glob("color-lock-audit-report-*.json"):
+            old_report.unlink()
+        variant_dirs[wf] = out_dir
 
     stdout = stdout_path.open("w", encoding="utf-8", errors="replace")
     stderr = stderr_path.open("w", encoding="utf-8", errors="replace")
@@ -183,49 +208,56 @@ def main() -> int:
 
     try:
         wait_comfy_ready(args.port, 180)
-        for case in PRACTICAL_CASES:
-            print(f"\n=== Practical audit: {case['name']} ===")
-            result = subprocess.run(
-                [
-                    str(python),
-                    str(repo_root / "scripts/audit-color-lock-workflow.py"),
-                    "--comfy-url",
-                    f"http://127.0.0.1:{args.port}",
-                    "--repo-root",
-                    str(repo_root),
-                    "--output-dir",
-                    "tests/manual/comfy-output/practical-suite",
-                    "--steps",
-                    str(args.steps),
-                    "--timeout",
-                    str(args.timeout),
-                    "--prefix",
-                    f"RasterRelay/practical-suite/{case['name']}",
-                    "--source-image",
-                    case["source"],
-                    "--case-name",
-                    case["name"],
-                    "--width",
-                    str(args.width),
-                    "--height",
-                    str(args.height),
-                    "--mask-box",
-                    case["mask_box"],
-                    "--mask-shape",
-                    case["mask_shape"],
-                    "--prompt",
-                    case["prompt"],
-                    "--negative-prompt",
-                    NEGATIVE_PROMPT,
-                    "--min-changed-percent",
-                    "0.5",
-                ],
-                cwd=str(repo_root),
-                text=True,
-                timeout=args.timeout + 180,
-            )
-            if result.returncode != 0:
-                return result.returncode
+        for wf in workflow_list:
+            out_subdir = variant_dirs[wf].relative_to(repo_root).as_posix()
+            for case in cases:
+                print(f"\n=== Practical audit [{Path(wf).stem}]: {case['name']} ===")
+                audit_cmd = [
+                        str(python),
+                        str(repo_root / "scripts/audit-color-lock-workflow.py"),
+                        "--comfy-url",
+                        f"http://127.0.0.1:{args.port}",
+                        "--repo-root",
+                        str(repo_root),
+                        "--workflow",
+                        wf,
+                        "--output-dir",
+                        out_subdir,
+                        "--steps",
+                        str(args.steps),
+                        "--timeout",
+                        str(args.timeout),
+                        "--prefix",
+                        f"RasterRelay/ab-suite/{Path(wf).stem}/{case['name']}",
+                        "--source-image",
+                        case["source"],
+                        "--case-name",
+                        case["name"],
+                        "--width",
+                        str(args.width),
+                        "--height",
+                        str(args.height),
+                        "--mask-box",
+                        case["mask_box"],
+                        "--mask-shape",
+                        case["mask_shape"],
+                        "--prompt",
+                        case["prompt"],
+                        "--negative-prompt",
+                        NEGATIVE_PROMPT,
+                        "--min-changed-percent",
+                        "0.5",
+                ]
+                if args.measure_only:
+                    audit_cmd.append("--measure-only")
+                result = subprocess.run(
+                    audit_cmd,
+                    cwd=str(repo_root),
+                    text=True,
+                    timeout=args.timeout + 180,
+                )
+                if result.returncode != 0:
+                    return result.returncode
         return 0
     finally:
         process.terminate()

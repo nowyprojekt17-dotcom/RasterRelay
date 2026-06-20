@@ -34,7 +34,7 @@ from pathlib import Path
 
 import numpy as np
 import requests
-from PIL import Image, ImageDraw, ImageOps
+from PIL import Image, ImageDraw, ImageFilter, ImageOps
 
 
 def wait_server(base_url: str, timeout: int) -> dict:
@@ -101,8 +101,8 @@ def find_unsupported_workflow_inputs(workflow: dict, object_info: dict) -> list[
     return unsupported
 
 
-def assert_workflow_compatible(repo_root: Path, object_info: dict) -> None:
-    workflow = json.loads((repo_root / "photoshop_plugin/workflows/inpainting-api.json").read_text(encoding="utf-8"))
+def assert_workflow_compatible(repo_root: Path, object_info: dict, workflow_path: Path) -> None:
+    workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
     missing_nodes = [
         node_name
         for node_name in ("RasterRelayReferenceColorLock", "RasterRelayPadToDocument", "RasterRelaySaveImage")
@@ -265,9 +265,11 @@ def build_workflow(
     prefix: str,
     prompt: str,
     negative_prompt: str,
+    workflow_path: Path,
 ) -> dict:
-    workflow = json.loads((repo_root / "photoshop_plugin/workflows/inpainting-api.json").read_text(encoding="utf-8"))
-    mapping = json.loads((repo_root / "photoshop_plugin/workflows/inpainting-api.mapping.json").read_text(encoding="utf-8"))
+    mapping_path = workflow_path.with_name(workflow_path.stem + ".mapping.json")
+    workflow = json.loads(workflow_path.read_text(encoding="utf-8"))
+    mapping = json.loads(mapping_path.read_text(encoding="utf-8"))
     inputs = mapping["inputs"]
 
     set_workflow_input(workflow, inputs["sourceImage"], source_upload["name"])
@@ -305,6 +307,48 @@ def build_workflow(
 
     workflow["80"]["inputs"]["filename_prefix"] = prefix
     return workflow
+
+
+def seam_band_metrics(composite: np.ndarray, source: np.ndarray, alpha_positive: np.ndarray, band: int = 8) -> dict:
+    """Tonal step across the mask boundary.
+
+    Compares the mean colour of a thin ring just INSIDE the patch (generated,
+    composited) against a ring just OUTSIDE (original). A visible "stitch" shows
+    up as a non-zero step. We also measure the same step on the source image and
+    report the excess, so natural content gradients at the boundary are not
+    counted as a seam.
+    """
+    outside = ~alpha_positive
+    if not alpha_positive.any() or not outside.any():
+        return {"seam_measured": False}
+    k = 2 * int(band) + 1
+    m = Image.fromarray((alpha_positive.astype(np.uint8) * 255), "L")
+    dilated = np.asarray(m.filter(ImageFilter.MaxFilter(k))) > 127
+    eroded = np.asarray(m.filter(ImageFilter.MinFilter(k))) > 127
+    inner = alpha_positive & (~eroded)   # inside mask, within `band` of the edge
+    outer = outside & dilated            # outside mask, within `band` of the edge
+    if not inner.any() or not outer.any():
+        return {"seam_measured": False}
+
+    comp = composite.astype(np.float32)
+    src = source.astype(np.float32)
+    lw = np.array([0.2126, 0.7152, 0.0722], dtype=np.float32)
+    c_in, c_out = comp[inner].mean(axis=0), comp[outer].mean(axis=0)
+    s_in, s_out = src[inner].mean(axis=0), src[outer].mean(axis=0)
+    seam_rgb = float(np.abs(c_in - c_out).max())
+    src_rgb = float(np.abs(s_in - s_out).max())
+    seam_luma = float(abs(float((c_in * lw).sum()) - float((c_out * lw).sum())))
+    src_luma = float(abs(float((s_in * lw).sum()) - float((s_out * lw).sum())))
+    return {
+        "seam_measured": True,
+        "seam_band_px": int(band),
+        "seam_inner_pixels": int(inner.sum()),
+        "seam_outer_pixels": int(outer.sum()),
+        "seam_rgb_step_levels": seam_rgb,
+        "seam_rgb_step_excess_vs_source_levels": seam_rgb - src_rgb,
+        "seam_luma_step_levels": seam_luma,
+        "seam_luma_step_excess_vs_source_levels": seam_luma - src_luma,
+    }
 
 
 def measure_result(source: Image.Image, result_path: Path, image_meta: dict, prompt_id: str) -> dict:
@@ -375,7 +419,10 @@ def measure_result(source: Image.Image, result_path: Path, image_meta: dict, pro
     composite_saturation_error = np.abs(composite_saturation - source_saturation)
     raw_saturation_error = np.abs(raw_saturation - source_saturation)
 
-    return {
+    in_mask_mean_diff = float(composite_diff[alpha_positive].mean()) if alpha_positive.any() else None
+    seam = seam_band_metrics(composite, source_array, alpha_positive)
+
+    report = {
         "prompt_id": prompt_id,
         "result_path": str(result_path),
         "image_meta": image_meta,
@@ -407,7 +454,10 @@ def measure_result(source: Image.Image, result_path: Path, image_meta: dict, pro
         "raw_source_saturation_max_error_where_alpha_positive": float(raw_saturation_error[hue_checked].max()) if hue_checked.any() else None,
         "composite_changed_pixels": int((composite_diff > 0).sum()),
         "composite_changed_percent": float((composite_diff > 0).mean() * 100),
+        "in_mask_mean_composite_diff_levels": in_mask_mean_diff,
     }
+    report.update(seam)
+    return report
 
 
 def assert_report(report: dict, min_changed_percent: float = 0.0) -> None:
@@ -456,9 +506,22 @@ def main() -> int:
     parser.add_argument("--prompt", default=None)
     parser.add_argument("--negative-prompt", default=None)
     parser.add_argument("--min-changed-percent", type=float, default=0.0)
+    parser.add_argument(
+        "--workflow",
+        default="photoshop_plugin/workflows/inpainting-api.json",
+        help="Workflow JSON to audit (its <stem>.mapping.json must sit next to it).",
+    )
+    parser.add_argument(
+        "--measure-only",
+        action="store_true",
+        help="Write metrics but skip the pass/fail invariant asserts (for A/B comparison runs).",
+    )
     args = parser.parse_args()
 
     repo_root = Path(args.repo_root).resolve()
+    workflow_path = Path(args.workflow)
+    if not workflow_path.is_absolute():
+        workflow_path = (repo_root / workflow_path).resolve()
     output_dir = (repo_root / args.output_dir).resolve()
     source_image = Path(args.source_image).resolve() if args.source_image else None
     case_name = args.case_name or (source_image.stem if source_image else "synthetic")
@@ -467,7 +530,7 @@ def main() -> int:
 
     wait_server(args.comfy_url, timeout=180)
     object_info = requests.get(f"{args.comfy_url}/object_info", timeout=30).json()
-    assert_workflow_compatible(repo_root, object_info)
+    assert_workflow_compatible(repo_root, object_info, workflow_path)
 
     mask_box = parse_mask_box(args.mask_box, args.width, args.height)
     if source_image and mask_box:
@@ -501,6 +564,7 @@ def main() -> int:
         args.prefix,
         prompt,
         negative_prompt,
+        workflow_path,
     )
 
     response = requests.post(
@@ -520,6 +584,7 @@ def main() -> int:
     image_meta = find_first_output_image(history)
     result_path = download_output(args.comfy_url, output_dir, image_meta)
     report = measure_result(source, result_path, image_meta, prompt_id)
+    report["workflow"] = str(workflow_path)
     report["case_name"] = case_name
     report["source_image"] = str(source_image) if source_image else None
     report["prompt"] = prompt
@@ -531,6 +596,9 @@ def main() -> int:
 
     report_path.write_text(json.dumps(report, indent=2), encoding="utf-8")
     print(json.dumps(report, indent=2))
+    if args.measure_only:
+        print(f"RasterRelay color-lock metrics written (no assert): {report_path}")
+        return 0
     assert_report(report, args.min_changed_percent)
     print(f"RasterRelay color-lock audit OK: {report_path}")
     return 0

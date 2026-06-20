@@ -26,6 +26,8 @@ photoshop_plugin/rasterrelay-lora-config.json
 tests/manual/test-results/
 tests/manual/test-results/*.tmp
 tests/manual/test-results/*.log
+# ComfyUI audit/A-B run artifacts (generated)
+tests/manual/comfy-output/
 # Test image fixtures (binary, kept local only)
 tests/manual/test-images/
 
