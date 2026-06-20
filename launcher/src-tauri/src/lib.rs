@@ -691,36 +691,81 @@ fn start_comfyui(
         };
 
         let python_path = find_python_executable(&root);
-        let mut command = Command::new(python_path);
-        command
-            .arg("main.py")
-            .arg("--base-directory")
-            .arg(&runtime_dirs.base)
-            .arg("--input-directory")
-            .arg(&runtime_dirs.input)
-            .arg("--output-directory")
-            .arg(&runtime_dirs.output)
-            .arg("--temp-directory")
-            .arg(&runtime_dirs.temp)
-            .arg("--extra-model-paths-config")
-            .arg(&runtime_dirs.extra_model_paths)
-            .arg("--database-url")
-            .arg(format!("sqlite:///{}", path_text(&runtime_dirs.database).replace('\\', "/")))
-            .current_dir(&root);
+        let db_url = format!(
+            "sqlite:///{}",
+            path_text(&runtime_dirs.database).replace('\\', "/")
+        );
+
+        // On Windows, "Start z terminalem" must route through `cmd /K`. The
+        // release launcher is a GUI app (windows_subsystem = "windows") with no
+        // console of its own, so a bare CREATE_NEW_CONSOLE child inherits null
+        // std handles and shows an empty window that closes immediately. cmd
+        // owns the new console, python inherits it (logs are visible), and /K
+        // keeps the window open after ComfyUI exits.
+        #[cfg(windows)]
+        let console_via_cmd = show_console;
+        #[cfg(not(windows))]
+        let console_via_cmd = false;
+
+        let mut command = if console_via_cmd {
+            let inner = format!(
+                "\"{}\" main.py --base-directory \"{}\" --input-directory \"{}\" --output-directory \"{}\" --temp-directory \"{}\" --extra-model-paths-config \"{}\" --database-url \"{}\"",
+                path_text(&python_path),
+                path_text(&runtime_dirs.base),
+                path_text(&runtime_dirs.input),
+                path_text(&runtime_dirs.output),
+                path_text(&runtime_dirs.temp),
+                path_text(&runtime_dirs.extra_model_paths),
+                db_url,
+            );
+            let mut cmd = Command::new("cmd");
+            #[cfg(windows)]
+            {
+                use std::os::windows::process::CommandExt;
+                cmd.raw_arg("/K");
+                // Outer quotes so cmd strips exactly one pair and keeps the
+                // per-path quotes inside (spaces in paths stay intact).
+                cmd.raw_arg(format!("\"{inner}\""));
+            }
+            let _ = &inner;
+            cmd
+        } else {
+            let mut cmd = Command::new(&python_path);
+            cmd.arg("main.py")
+                .arg("--base-directory")
+                .arg(&runtime_dirs.base)
+                .arg("--input-directory")
+                .arg(&runtime_dirs.input)
+                .arg("--output-directory")
+                .arg(&runtime_dirs.output)
+                .arg("--temp-directory")
+                .arg(&runtime_dirs.temp)
+                .arg("--extra-model-paths-config")
+                .arg(&runtime_dirs.extra_model_paths)
+                .arg("--database-url")
+                .arg(&db_url);
+            cmd
+        };
+
+        command.current_dir(&root);
         command.env("PYTHONIOENCODING", "utf-8");
         command.env("PYTHONUTF8", "1");
         command.env("RASTERRELAY_OUTPUT_DIR", &runtime_dirs.output);
 
-        if show_console {
-            command
-                .stdin(Stdio::null())
-                .stdout(Stdio::inherit())
-                .stderr(Stdio::inherit());
-        } else {
-            command
-                .stdin(Stdio::null())
-                .stdout(Stdio::null())
-                .stderr(Stdio::null());
+        // cmd already owns its new console; only redirect when we launch python
+        // directly (headless null, or non-Windows show_console inherits).
+        if !console_via_cmd {
+            if show_console {
+                command
+                    .stdin(Stdio::null())
+                    .stdout(Stdio::inherit())
+                    .stderr(Stdio::inherit());
+            } else {
+                command
+                    .stdin(Stdio::null())
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null());
+            }
         }
 
         #[cfg(windows)]

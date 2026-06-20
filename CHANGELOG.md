@@ -10,6 +10,13 @@ a ten projekt adheres to [Semantic Versioning](https://semver.org/lang/pl/).
 > 📋 Pełny narracyjny raport tej sesji (problem koloru, Fazy A–D, hotfixy,
 > Tier 1–3, metryki, lekcje): [`docs/raport-sesji-2026-06-12.md`](docs/raport-sesji-2026-06-12.md).
 
+### Fixed (Launcher)
+- **Start ComfyUI z terminalem**: release launcher działa jako aplikacja GUI bez
+  własnej konsoli (`windows_subsystem = "windows"`), więc `CREATE_NEW_CONSOLE` +
+  `Stdio::inherit()` dawało puste/znikające okno. Ścieżka terminalowa uruchamia
+  teraz ComfyUI przez `cmd /K`, które posiada nową konsolę i utrzymuje ją otwartą;
+  zwykły start bez terminala pozostaje ukryty.
+
 ### Changed (Tier 4 — pomiarowe uproszczenie łańcucha koloru)
 - **Łańcuch koloru skrócony 42 → 30 węzłów** na podstawie A/B (5 przypadków
   krytycznych kolorystycznie, `scripts/run-practical-color-lock-suite-with-comfy.py`).
