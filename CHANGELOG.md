@@ -10,7 +10,12 @@ a ten projekt adheres to [Semantic Versioning](https://semver.org/lang/pl/).
 > 📋 Pełny narracyjny raport tej sesji (problem koloru, Fazy A–D, hotfixy,
 > Tier 1–3, metryki, lekcje): [`docs/raport-sesji-2026-06-12.md`](docs/raport-sesji-2026-06-12.md).
 
-### Fixed (Launcher)
+### Fixed (Launcher / Photoshop)
+- **Pixel-audyt koloru w Photoshopie**: `imaging.getPixels()` wymaga modal scope,
+  więc snapshot przed/po kompozycji jest teraz pobierany przez `executeAsModal`
+  (`RasterRelay Pixel Audit Snapshot`). Bez tego wtyczka pobierała wynik z
+  ComfyUI, ale odmawiała wstawienia warstwy: „The requested functionality is only
+  allowed from inside a modal scope".
 - **Start ComfyUI z terminalem**: release launcher działa jako aplikacja GUI bez
   własnej konsoli (`windows_subsystem = "windows"`), więc `CREATE_NEW_CONSOLE` +
   `Stdio::inherit()` dawało puste/znikające okno. Ścieżka terminalowa uruchamia

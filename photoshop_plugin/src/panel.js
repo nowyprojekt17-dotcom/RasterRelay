@@ -437,18 +437,21 @@ async function getDocumentCompositeSnapshot(document, size = readDocumentSize(do
     throw new Error(`Invalid document size for composite audit: ${width}x${height}.`);
   }
 
-  const pixelResult = await photoshop.imaging.getPixels({
-    documentID: document.id,
-    sourceBounds: {
-      left: 0,
-      top: 0,
-      right: width,
-      bottom: height
-    },
-    componentSize: 8,
-    colorSpace: "RGB",
-    applyAlpha: true
-  });
+  const pixelResult = await photoshop.core.executeAsModal(
+    () => photoshop.imaging.getPixels({
+      documentID: document.id,
+      sourceBounds: {
+        left: 0,
+        top: 0,
+        right: width,
+        bottom: height
+      },
+      componentSize: 8,
+      colorSpace: "RGB",
+      applyAlpha: true
+    }),
+    { commandName: "RasterRelay Pixel Audit Snapshot" }
+  );
 
   try {
     const imageData = pixelResult.imageData;
