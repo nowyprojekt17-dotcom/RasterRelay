@@ -66,6 +66,12 @@ Nie budujemy launchera/wtyczki wokół niesprawdzonego workflow. Jakość udowad
   „ComfyBridge"** (bardzo stara wersja tego samego projektu): pakiet węzłów `comfybridge_nodes`,
   wtyczka UXP `com.comfybridge.localai`, `comfybridge-launcher` (AppData), katalogi `input\comfybridge*`.
   Uwaga: `comfybridge_nodes` nie był w repo i nie ma kopii — usunięty nieodwracalnie (autoryzowane).
+- **2026-06-21 — Arsenał węzłów.** Zainstalowano 11 pakietów custom node pod jakość/maski/most
+  do wtyczki (lista + opisy w `WEZLY-ARSENAL.md`). Najważniejszy: ComfyUI-Inpaint-CropAndStitch.
+- **2026-06-21 — ⚠ Problem środowiska: torch CPU.** Venv ComfyUI ma `torch 2.12.1` + `torchvision 0.27.1`
+  w wersji **CPU** (podmienione dziś ~20:29, niezależnie od instalacji węzłów — moja instalacja była
+  21:54 i nie ruszała torcha; torchaudio został `2.11.0+cu128` z 01.06). ComfyUI nie startuje
+  („Torch not compiled with CUDA enabled"). **Blokuje weryfikację węzłów i pracę na GPU — do naprawy.**
 - **2026-06-21 — Metodyka workflow-first.** Najpierw działające, sprawdzone workflow w ComfyUI,
   dopiero potem launcher i wtyczka. (szczegóły w sekcji 2)
 - **2026-06-21 — Model v1: Flux Klein 9B.** Zostajemy przy nim na start. Później możliwe
