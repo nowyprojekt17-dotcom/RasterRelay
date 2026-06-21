@@ -60,6 +60,12 @@ Nie budujemy launchera/wtyczki wokół niesprawdzonego workflow. Jakość udowad
   UI), ale **zachowujemy zmierzone fakty** (sekcja 5) jako znane pułapki, żeby nie odkrywać ich drugi raz.
 - **2026-06-21 — Sprzątanie.** Usunięte nieaktualne gałęzie `cleanup/2026-06-11`
   i `codex/fix/e2e-and-repository-hygiene`.
+- **2026-06-21 — Czyszczenie ComfyUI ze starych śladów.** Usunięte z `E:\AI\ComfyUI`:
+  `custom_nodes\rasterrelay_nodes` (odtwarzalny z historii git), artefakty `input\rasterrelay-*`,
+  `output\RasterRelay`, runtime `%TEMP%\RasterRelay`. Dodatkowo wykryto i usunięto **cały ślad
+  „ComfyBridge"** (bardzo stara wersja tego samego projektu): pakiet węzłów `comfybridge_nodes`,
+  wtyczka UXP `com.comfybridge.localai`, `comfybridge-launcher` (AppData), katalogi `input\comfybridge*`.
+  Uwaga: `comfybridge_nodes` nie był w repo i nie ma kopii — usunięty nieodwracalnie (autoryzowane).
 - **2026-06-21 — Metodyka workflow-first.** Najpierw działające, sprawdzone workflow w ComfyUI,
   dopiero potem launcher i wtyczka. (szczegóły w sekcji 2)
 - **2026-06-21 — Model v1: Flux Klein 9B.** Zostajemy przy nim na start. Później możliwe
