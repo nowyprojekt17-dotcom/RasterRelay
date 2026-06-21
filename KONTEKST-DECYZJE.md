@@ -68,10 +68,14 @@ Nie budujemy launchera/wtyczki wokół niesprawdzonego workflow. Jakość udowad
   Uwaga: `comfybridge_nodes` nie był w repo i nie ma kopii — usunięty nieodwracalnie (autoryzowane).
 - **2026-06-21 — Arsenał węzłów.** Zainstalowano 11 pakietów custom node pod jakość/maski/most
   do wtyczki (lista + opisy w `WEZLY-ARSENAL.md`). Najważniejszy: ComfyUI-Inpaint-CropAndStitch.
-- **2026-06-21 — ⚠ Problem środowiska: torch CPU.** Venv ComfyUI ma `torch 2.12.1` + `torchvision 0.27.1`
-  w wersji **CPU** (podmienione dziś ~20:29, niezależnie od instalacji węzłów — moja instalacja była
-  21:54 i nie ruszała torcha; torchaudio został `2.11.0+cu128` z 01.06). ComfyUI nie startuje
-  („Torch not compiled with CUDA enabled"). **Blokuje weryfikację węzłów i pracę na GPU — do naprawy.**
+- **2026-06-21 — ✅ Naprawiono torch CPU.** Przyczyna: ktoś dziś ~20:29 zrobił `pip install torch==2.12.1`
+  z domyślnego PyPI → wersja CPU (CUDA dla 2.12.1 nie istnieje; max cu128 to 2.11.0). Fix: rollback do
+  `torch 2.11.0+cu128` + `torchvision 0.26.0+cu128` (zgodne z ocalałym `torchaudio 2.11.0+cu128`).
+  Po naprawie: `torch.cuda.is_available()=True`, RTX 3090 24 GB widoczne, ComfyUI startuje (~81s).
+  Usunięto też osierocony `~ransformers` i doinstalowano brakujące deps 4 wcześniejszych pakietów
+  (Impact/Inspire/Crystools/SAM1: piexif, webcolors, deepdiff, segment-anything, imageio-ffmpeg).
+- **2026-06-21 — ✅ Weryfikacja arsenału.** Wszystkie 11 nowych pakietów importują się czysto w ComfyUI
+  (zero IMPORT FAILED). Lista + opisy: `WEZLY-ARSENAL.md`.
 - **2026-06-21 — Metodyka workflow-first.** Najpierw działające, sprawdzone workflow w ComfyUI,
   dopiero potem launcher i wtyczka. (szczegóły w sekcji 2)
 - **2026-06-21 — Model v1: Flux Klein 9B.** Zostajemy przy nim na start. Później możliwe

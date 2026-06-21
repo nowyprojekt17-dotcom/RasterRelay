@@ -5,9 +5,9 @@ zależności Pythona zainstalowane w `.venv`). Dobór celuje w nasze wyzwania: e
 tylko wycinka + **bezszwowe wklejenie**, dopasowanie koloru/tonu/ziarna na szwie,
 precyzyjne maski i most do przyszłej wtyczki.
 
-> Status weryfikacji importu: **oczekuje** — ComfyUI nie startuje z powodu niezależnego
-> problemu z torch (wersja CPU, patrz `KONTEKST-DECYZJE.md`). Pakiety są zainstalowane;
-> czysty import potwierdzę po naprawie torch.
+> Status weryfikacji importu: **✅ potwierdzony** — wszystkie 11 pakietów importują się czysto
+> w uruchomionym ComfyUI (zero IMPORT FAILED), GPU RTX 3090 aktywne. (Wcześniejszy blocker torch
+> CPU naprawiony — szczegóły w `KONTEKST-DECYZJE.md`.)
 
 | # | Pakiet | Co robi | Jak się przyda u nas |
 |---|--------|---------|----------------------|
