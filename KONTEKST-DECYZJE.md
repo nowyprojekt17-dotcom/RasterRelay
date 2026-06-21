@@ -5,7 +5,7 @@
 > **Aktualizuj go na bieżąco** — po każdym nowym ustaleniu, zmianie kierunku lub
 > zamknięciu otwartego pytania. Dokument ma zawsze odzwierciedlać stan faktyczny.
 >
-> Ostatnia aktualizacja: 2026-06-21
+> Ostatnia aktualizacja: 2026-06-21 (metodyka workflow-first)
 
 ---
 
@@ -29,7 +29,18 @@ jednym kliknięciem, bo użytkownik jest nietechniczny.
 
 ## 2. Aktualny etap
 
-**Faza dyskusji / projektowania. Nie budujemy jeszcze nic.** Najpierw ustalamy założenia.
+**Faza dyskusji / projektowania.** Metodyka pracy już ustalona (patrz niżej: workflow-first).
+Najpierw domykamy założenia, potem zaczynamy od workflow w ComfyUI.
+
+### Metodyka: WORKFLOW-FIRST (zasada nadrzędna)
+
+Kolejność prac jest odwrócona względem starego podejścia:
+1. **Najpierw** budujemy działające workflow inpaintingu w ComfyUI i **iterujemy je,
+   aż da zadowalające rezultaty.** To tu leży całe ryzyko i sedno jakości.
+2. **Dopiero potem**, gdy workflow jest gotowe i sprawdzone, dbamy o to, żeby dało się je
+   podpiąć pod launcher i wtyczkę Photoshop.
+
+Nie budujemy launchera/wtyczki wokół niesprawdzonego workflow. Jakość udowadniamy w ComfyUI.
 
 ## 3. Ustalenia (log decyzji)
 
@@ -42,6 +53,8 @@ jednym kliknięciem, bo użytkownik jest nietechniczny.
   UI), ale **zachowujemy zmierzone fakty** (sekcja 5) jako znane pułapki, żeby nie odkrywać ich drugi raz.
 - **2026-06-21 — Sprzątanie.** Usunięte nieaktualne gałęzie `cleanup/2026-06-11`
   i `codex/fix/e2e-and-repository-hygiene`.
+- **2026-06-21 — Metodyka workflow-first.** Najpierw działające, sprawdzone workflow w ComfyUI,
+  dopiero potem launcher i wtyczka. (szczegóły w sekcji 2)
 
 ## 4. Czego NIE robić
 
@@ -73,8 +86,9 @@ Obserwacje o samym problemie/modelu — przydatne, nawet jeśli podejście się 
 2. Co konkretnie ma być „lepiej przemyślane" w nowej wtyczce — czego brakowało/co frustrowało.
 3. Zostajemy na ComfyUI + Flux Klein, czy zmieniamy silnik/model?
 4. Stack launchera: Tauri+React vs coś lżejszego.
-5. Podział odpowiedzialności launcher ↔ wtyczka (ile konfiguracji w panelu).
-6. Kolejność budowy: launcher najpierw czy wtyczka; nowy graf od razu czy tymczasowy.
+5. Podział odpowiedzialności launcher ↔ wtyczka (ile konfiguracji w panelu). *(dot. fazy 2 — po workflow)*
+6. ~~Kolejność budowy~~ — **zamknięte:** workflow-first (sekcja 2).
+7. Jak definiujemy „zadowalające rezultaty" workflow — kryterium i sposób pomiaru jakości/bezszwowości.
 
 ## 8. Powiązane materiały
 
