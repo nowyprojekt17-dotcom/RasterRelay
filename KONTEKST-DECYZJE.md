@@ -55,6 +55,13 @@ Nie budujemy launchera/wtyczki wokół niesprawdzonego workflow. Jakość udowad
   i `codex/fix/e2e-and-repository-hygiene`.
 - **2026-06-21 — Metodyka workflow-first.** Najpierw działające, sprawdzone workflow w ComfyUI,
   dopiero potem launcher i wtyczka. (szczegóły w sekcji 2)
+- **2026-06-21 — Model v1: Flux Klein 9B.** Zostajemy przy nim na start. Później możliwe
+  warianty workflow z innymi modelami edytującymi → nie sprzęgać grafu z Kleinem na sztywno
+  bardziej niż trzeba, ale **nie budować teraz abstrakcji multi-model** (YAGNI — dopiero gdy realnie wejdzie drugi model).
+- **2026-06-21 — Ocena jakości.** Ostateczny werdykt należy do użytkownika (ocena okiem).
+  Agent ma **prawo i obowiązek filtrować**: nie pokazywać słabych wyników, iterować dalej i
+  przynosić tylko te warte oceny. Metryki bezszwowości (np. delta szwu) służą **agentowi jako
+  narzędzie triażu** „pokazać czy poprawiać", nie użytkownikowi jako kryterium.
 
 ## 4. Czego NIE robić
 
@@ -80,15 +87,22 @@ Obserwacje o samym problemie/modelu — przydatne, nawet jeśli podejście się 
   (text encoder), `flux2-vae.safetensors` (vae). RTX 3090 24 GB.
 - Czy zostajemy na ComfyUI + Flux Klein — **otwarte** (sekcja 7).
 
-## 7. Otwarte pytania (do zamknięcia przed kodem)
+## 7. Otwarte pytania
 
-1. **Skąd świeży start?** Rozczarowanie starym vs nowy pomysł/kierunek w głowie użytkownika. *(w trakcie)*
-2. Co konkretnie ma być „lepiej przemyślane" w nowej wtyczce — czego brakowało/co frustrowało.
-3. Zostajemy na ComfyUI + Flux Klein, czy zmieniamy silnik/model?
-4. Stack launchera: Tauri+React vs coś lżejszego.
-5. Podział odpowiedzialności launcher ↔ wtyczka (ile konfiguracji w panelu). *(dot. fazy 2 — po workflow)*
-6. ~~Kolejność budowy~~ — **zamknięte:** workflow-first (sekcja 2).
-7. Jak definiujemy „zadowalające rezultaty" workflow — kryterium i sposób pomiaru jakości/bezszwowości.
+### Blokujące start workflow (faza 1)
+- Jakie typy edycji ma obsłużyć workflow v1 (usuwanie obiektu / podmiana / domalowanie / zmiana koloru…)? *(do ustalenia)*
+- Na jakich przypadkach testowych iterujemy (wybór z `test-images/`)? *(do ustalenia)*
+
+### Faza 2 (po gotowym workflow)
+- Co konkretnie ma być „lepiej przemyślane" w nowej wtyczce — czego brakowało/co frustrowało.
+- Stack launchera: Tauri+React vs coś lżejszego.
+- Podział odpowiedzialności launcher ↔ wtyczka (ile konfiguracji w panelu).
+
+### Zamknięte
+- ~~Kolejność budowy~~ → workflow-first (sekcja 2).
+- ~~Model/silnik~~ → Flux Klein 9B na v1, multi-model później (sekcja 3).
+- ~~Definicja „zadowalających rezultatów"~~ → werdykt użytkownika okiem, agent filtruje słabe wyniki (sekcja 3).
+- ~~Skąd świeży start~~ → odwrócenie kolejności pracy na workflow-first (sekcja 2); kierunek nie wynikał z rozczarowania, tylko z lepszej metodyki.
 
 ## 8. Powiązane materiały
 
