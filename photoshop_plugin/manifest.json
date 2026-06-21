@@ -31,20 +31,6 @@
         "width": 360,
         "height": 620
       }
-    },
-    {
-      "type": "command",
-      "id": "runE2ESmokeTest",
-      "label": {
-        "default": "RasterRelay Test E2E"
-      }
-    },
-    {
-      "type": "command",
-      "id": "runGeometrySmokeTest",
-      "label": {
-        "default": "RasterRelay Geometry Test"
-      }
     }
   ],
   "requiredPermissions": {

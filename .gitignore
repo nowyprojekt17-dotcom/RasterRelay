@@ -14,22 +14,14 @@ launcher/src-tauri/target/
 Thumbs.db
 **/__pycache__/
 *.py[cod]
+.agents/
+.claude/
 .understand-anything/
 
-# RasterRelay local test triggers and temporary reports
-photoshop_plugin/e2e-autostart.flag
-photoshop_plugin/geometry-autostart.flag
+# RasterRelay local runtime settings
 photoshop_plugin/*.log
 photoshop_plugin/rasterrelay-quality-settings.json
 photoshop_plugin/rasterrelay-lora-config.json
-# Test results (generated)
-tests/manual/test-results/
-tests/manual/test-results/*.tmp
-tests/manual/test-results/*.log
-# ComfyUI audit/A-B run artifacts (generated)
-tests/manual/comfy-output/
-# Test image fixtures (binary, kept local only)
-tests/manual/test-images/
 
 # Local sqlite scratch DBs (created by MCP/bridge tooling at runtime)
 generations.db

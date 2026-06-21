@@ -8,10 +8,6 @@ const QUALITY_SETTINGS_FILE_NAME = "rasterrelay-quality-settings.json";
 const LORA_CONFIG_FILE_NAME = "rasterrelay-lora-config.json";
 const WORKFLOW_FILE_NAME = "workflows/inpainting-api.json";
 const WORKFLOW_MAPPING_FILE_NAME = "workflows/inpainting-api.mapping.json";
-const INSTALL_NODES_COMMAND = "powershell -ExecutionPolicy Bypass -File .\\scripts\\install-comfy-nodes.ps1 -ComfyRoot E:\\AI\\ComfyUI";
-const E2E_AUTOSTART_FILE_NAME = "e2e-autostart.flag";
-const GEOMETRY_AUTOSTART_FILE_NAME = "geometry-autostart.flag";
-const GEOMETRY_TEST_SOURCE_FILE_NAME = "test_assets/can-source.png";
 const COMFY_HISTORY_TIMEOUT_MS = 10 * 60 * 1000;
 const COMFY_HISTORY_POLL_MS = 2000;
 const DEFAULT_MASK_FEATHER_RATIO = 0.015;
@@ -19,12 +15,6 @@ const DEFAULT_MASK_FEATHER_MIN_PX = 8;
 const DEFAULT_MASK_FEATHER_MAX_PX = 32;
 const SELECTION_PADDING_PX = 96;
 const GENERATION_SIZE_MULTIPLE = 16;
-const GEOMETRY_TEST_SELECTION = {
-  centerX: 711,
-  centerY: 542,
-  radiusX: 42,
-  radiusY: 68
-};
 const panelHelpers = globalThis.RasterRelayPanelHelpers || {};
 const defaultQualitySettings = panelHelpers.normalizeQualitySettings
   ? panelHelpers.normalizeQualitySettings({})
@@ -51,8 +41,6 @@ const qualityPresets = {
 };
 
 let ui = null;
-let autostartE2EConsumed = false;
-
 const panelMarkup = `
   <main class="rr-panel-shell">
     <header class="rr-panel-header">
@@ -89,7 +77,6 @@ const panelMarkup = `
 
     <section class="action-section" aria-label="Funkcja RasterRelay">
       <button class="primary" id="prepareButton">Przygotuj edycje</button>
-      <button class="dev-only" id="e2eSmokeButton">Test E2E</button>
       <button id="documentButton">Sprawdź dokument</button>
     </section>
 
@@ -133,7 +120,6 @@ function collectUi(rootNode) {
     comfyDot: findPanelElement(rootNode, "comfyDot"),
     comfyStatus: findPanelElement(rootNode, "comfyStatus"),
     documentButton: findPanelElement(rootNode, "documentButton"),
-    e2eSmokeButton: findPanelElement(rootNode, "e2eSmokeButton"),
     heartbeatText: findPanelElement(rootNode, "heartbeatText"),
     messageText: findPanelElement(rootNode, "messageText"),
     packageButton: findPanelElement(rootNode, "packageButton"),
@@ -276,7 +262,7 @@ function describeComfyError(error) {
     return "Zabrakło pamięci GPU (VRAM). Zmniejsz zaznaczenie albo użyj presetu „Szybki”. Szczegóły: " + raw;
   }
   if (lower.includes("odrzucilo workflow") || lower.includes("node_errors")) {
-    return "ComfyUI odrzuciło workflow — najczęściej brak modelu lub węzła. Przeinstaluj RasterRelay nodes i sprawdź modele. Szczegóły: " + raw;
+    return "ComfyUI odrzuciło workflow — obecny workflow/custom node'y zostały wyczyszczone pod przebudowę. Szczegóły: " + raw;
   }
   return raw || "Nieznany błąd.";
 }
@@ -1778,7 +1764,7 @@ async function uploadAssetsToComfy(files, maskData) {
       selectionMask: generationMaskUpload
     };
   } catch (error) {
-    throw new Error(`Could not upload mask to ComfyUI: ${error?.message || error}. Make sure ComfyUI is running and the rasterrelay_nodes package is installed.`);
+    throw new Error(`Could not upload mask to ComfyUI: ${error?.message || error}. Make sure ComfyUI is running.`);
   }
 }
 
@@ -2030,7 +2016,7 @@ async function queueComfyWorkflow(job, comfyUploads) {
   const unsupportedInputs = findUnsupportedWorkflowInputs(workflow, objectInfo);
   if (unsupportedInputs.length) {
     throw new Error(
-      `ComfyUI ma nieaktualne albo niezgodne custom nodes. Brakuje wejsc workflow: ${unsupportedInputs.join(", ")}. Zatrzymaj ComfyUI, uruchom w katalogu projektu: ${INSTALL_NODES_COMMAND}, potem zrestartuj ComfyUI.`
+      `ComfyUI ma nieaktualne albo niezgodne wejscia workflow: ${unsupportedInputs.join(", ")}. Stary pakiet RasterRelay custom nodes zostal usuniety pod przebudowe.`
     );
   }
 
@@ -3380,164 +3366,7 @@ function initializePanel(rootNode) {
     });
   }
 
-  if (ui.e2eSmokeButton) {
-    ui.e2eSmokeButton.addEventListener("click", () => {
-      void runE2ESmokeTest();
-    });
-  }
-
   rootNode.__rasterRelayInitialized = true;
-
-  window.setTimeout(() => {
-    void runAutostartE2EIfRequested();
-  }, 1000);
-}
-
-async function runE2ESmokeTest() {
-  if (!globalThis.RasterRelayE2ESmokeTest?.run) {
-    setMessage("Test E2E nie jest załadowany w panelu.");
-    return;
-  }
-
-  if (ui?.e2eSmokeButton) {
-    ui.e2eSmokeButton.disabled = true;
-  }
-
-  setMessage("Uruchamiam test E2E: Photoshop -> ComfyUI -> warstwa wynikowa...");
-
-  try {
-    const result = await globalThis.RasterRelayE2ESmokeTest.run();
-    const audit = result?.compositeAudit;
-    setMessage(
-      result?.promptId
-        ? `Test E2E zakończony. Wynik wstawiony jako warstwa. Prompt ID: ${result.promptId}.`
-        : "Test E2E zakończony. Sprawdź nowy dokument i warstwę w Photoshopie."
-    );
-    if (audit?.checked) {
-      setMessage(
-        `Test E2E OK. Pixel audit: outsideChanged=${audit.outsideChangedPixels}, maxDiff=${audit.maxDiffOutsideAlphaBBox}, sourceHueMax=${audit.sourceHueMaxErrorInsideChanged ?? "n/a"}, sourceSatMax=${audit.sourceSaturationMaxErrorInsideChanged ?? "n/a"}.`
-      );
-    }
-  } catch (error) {
-    setMessage(`Test E2E nie przeszedł: ${error.message || error}`);
-  } finally {
-    if (ui?.e2eSmokeButton) {
-      ui.e2eSmokeButton.disabled = false;
-    }
-  }
-}
-
-async function createGeometrySmokeDocument() {
-  const photoshop = getPhotoshopApi();
-  const testFile = await getPluginEntry(GEOMETRY_TEST_SOURCE_FILE_NAME);
-
-  await photoshop.core.executeAsModal(
-    async () => {
-      await photoshop.app.open(testFile);
-      await photoshop.action.batchPlay(
-        [
-          {
-            _obj: "set",
-            _target: [{ _ref: "channel", _property: "selection" }],
-            to: {
-              _obj: "ellipse",
-              top: { _unit: "pixelsUnit", _value: GEOMETRY_TEST_SELECTION.centerY - GEOMETRY_TEST_SELECTION.radiusY },
-              left: { _unit: "pixelsUnit", _value: GEOMETRY_TEST_SELECTION.centerX - GEOMETRY_TEST_SELECTION.radiusX },
-              bottom: { _unit: "pixelsUnit", _value: GEOMETRY_TEST_SELECTION.centerY + GEOMETRY_TEST_SELECTION.radiusY },
-              right: { _unit: "pixelsUnit", _value: GEOMETRY_TEST_SELECTION.centerX + GEOMETRY_TEST_SELECTION.radiusX }
-            }
-          }
-        ],
-        {}
-      );
-    },
-    { commandName: "RasterRelay Geometry Smoke Document" }
-  );
-
-  return photoshop.app.activeDocument;
-}
-
-async function runGeometrySmokeTest() {
-  const dataFolder = await getDataFolder();
-  const qualitySettings = await loadQualitySettings();
-  const document = await createGeometrySmokeDocument();
-  const exported = await exportInpaintingAssets(document, dataFolder, qualitySettings);
-  const report = {
-    ok: true,
-    test: "manual-export-geometry",
-    document: readDocumentSize(document),
-    selection: getSelectionInfo(document),
-    paddedBounds: exported.paddedBounds,
-    generationBounds: exported.generationBounds,
-    cropBounds: exported.cropBounds,
-    sourceImage: exported.assets.sourceImage,
-    mask: {
-      role: exported.assets.generationMask?.role || "generationMask",
-      width: exported.assets.maskData.selWidth,
-      height: exported.assets.maskData.selHeight,
-      options: exported.assets.generationMask?.options || null,
-      warnings: exported.maskAnalysis?.warnings || []
-    },
-    layerMask: exported.layerMaskData
-      ? {
-          role: exported.layerMaskData.role || "visibilityMask",
-          width: exported.layerMaskData.width,
-          height: exported.layerMaskData.height,
-          options: exported.layerMaskData.options || null,
-          warnings: exported.layerMaskData.analysis?.warnings || []
-        }
-      : null,
-    checks: {
-      sourceMatchesCrop:
-        exported.assets.sourceImage.width === exported.cropBounds.width &&
-        exported.assets.sourceImage.height === exported.cropBounds.height,
-      maskMatchesCrop:
-        exported.assets.maskData.selWidth === exported.cropBounds.width &&
-        exported.assets.maskData.selHeight === exported.cropBounds.height,
-      layerMaskMatchesDocument:
-        !exported.layerMaskData ||
-        (exported.layerMaskData.width === Math.round(readDocumentSize(document).width) &&
-          exported.layerMaskData.height === Math.round(readDocumentSize(document).height)),
-      cropMatchesGeneration:
-        exported.cropBounds.width === exported.generationBounds.width &&
-        exported.cropBounds.height === exported.generationBounds.height
-    }
-  };
-
-  const reportFile = await dataFolder.createFile(`rasterrelay-geometry-smoke-${createSafeTimestamp()}.json`, {
-    overwrite: true
-  });
-  await reportFile.write(JSON.stringify(report, null, 2));
-  setMessage(
-    report.checks.sourceMatchesCrop && report.checks.maskMatchesCrop
-      ? `Test geometrii OK: source i maska maja rozmiar cropu ${exported.cropBounds.width} x ${exported.cropBounds.height}.`
-      : "Test geometrii wykryl rozjazd rozmiarow source/maski."
-  );
-  console.log(JSON.stringify(report));
-  return report;
-}
-
-async function runAutostartE2EIfRequested() {
-  if (autostartE2EConsumed) {
-    return;
-  }
-
-  const geometryFlag = await getOptionalPluginTextFile(GEOMETRY_AUTOSTART_FILE_NAME);
-  if (geometryFlag) {
-    autostartE2EConsumed = true;
-    await removeOptionalPluginFile(GEOMETRY_AUTOSTART_FILE_NAME);
-    await runGeometrySmokeTest();
-    return;
-  }
-
-  const flag = await getOptionalPluginTextFile(E2E_AUTOSTART_FILE_NAME);
-  if (!flag) {
-    return;
-  }
-
-  autostartE2EConsumed = true;
-  await removeOptionalPluginFile(E2E_AUTOSTART_FILE_NAME);
-  await runE2ESmokeTest();
 }
 
 const uxpApi = getUxpApi();
@@ -3548,9 +3377,6 @@ if (uxpApi?.entrypoints) {
       create() {
         console.log("RasterRelay plugin loaded.");
         window.setTimeout(showRasterRelayPanel, 500);
-        window.setTimeout(() => {
-          void runAutostartE2EIfRequested();
-        }, 1200);
       }
     },
     panels: {
@@ -3562,18 +3388,6 @@ if (uxpApi?.entrypoints) {
         show(rootNode) {
           console.log("RasterRelay panel show.");
           initializePanel(rootNode);
-        }
-      }
-    },
-    commands: {
-      runE2ESmokeTest: {
-        run() {
-          return runE2ESmokeTest();
-        }
-      },
-      runGeometrySmokeTest: {
-        run() {
-          return runGeometrySmokeTest();
         }
       }
     }

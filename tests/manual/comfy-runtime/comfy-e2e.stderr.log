@@ -1,4 +1,0 @@
-aimdo: src-win/cuda-detour.c:38:INFO:aimdo_setup_hooks: installing 6 hooks
-aimdo: src-win/cuda-detour.c:28:DEBUG:install_hook_entries: hooks successfully installed
-aimdo: src-win/shmem-detect.c:80:INFO:comfy-aimdo WDDM adapter match: NVIDIA GeForce RTX 3090 runtime_luid=00000000:0000e53f dxgi_luid=00000000:0000e53f
-aimdo: src/control.c:237:INFO:comfy-aimdo inited for GPU: NVIDIA GeForce RTX 3090 (VRAM: 24575 MB)
