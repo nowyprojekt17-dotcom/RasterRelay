@@ -1,58 +1,77 @@
-# RasterRelay — Rebuild Map
+# RasterRelay — Rebuild Plan
 
-Stan po resecie (`d88835d`): projekt zwinięty do **shellu aplikacji**. Stary pipeline
-inpaintingu (custom nodes, workflow, łańcuch koloru, testy, skrypty audytu) usunięty.
-Ten plik mapuje, co zostało i gdzie wpiąć nowe podejście. Stary kod jest w historii
-gita sprzed `d88835d`, gdyby trzeba coś odzyskać.
+**Decyzja (2026-06-21):** budujemy **launcher od zera + nową, lepiej przemyślaną wtyczkę**.
+Obecny kod (`launcher/`, `photoshop_plugin/`) staje się **materiałem referencyjnym**, nie
+fundamentem. Stary pipeline inpaintingu usunięty w resecie `d88835d`; cała historia
+sprzed niego jest w gicie, gdyby trzeba coś podejrzeć/odzyskać.
 
-## Co zostało (reużywalny shell)
+## Co zostaje niezależnie od przebudowy
 
-| Część | Plik | Rola |
-|---|---|---|
-| Launcher (Tauri+React) | `launcher/src-tauri/src/lib.rs` | skan ComfyUI, instal LoRA/GGUF, start ComfyUI/Photoshop/UXP, ładowanie panelu |
-| Launcher UI | `launcher/src/App.tsx` | readiness, centrum jakości, LoRA stack |
-| Panel Photoshop (UXP) | `photoshop_plugin/src/panel.js` | eksport dokumentu, maska, upload do ComfyUI, submit, placement wyniku, ICC→sRGB |
-| Panel helpers | `photoshop_plugin/src/panel-helpers.js` | resolveQualityPlan, computeOptimalGenSize, edit-mode plan |
-| Brand / referencje | `assets/brand/`, `test-images/` | logo + obrazy testowe |
-| Skrypty | `scripts/{create-desktop-shortcut.ps1, load-uxp-plugin.mjs}` | shortcut + loader UXP |
+- `assets/brand/` — logo.
+- `test-images/` — obrazy referencyjne do testów.
+- Wiedza w sekcji „Lekcje" niżej (drogo okupiona pomiarami).
+- Środowisko ComfyUI (port, modele, izolowany runtime) — opis niżej.
 
-## Kontrakt styku z nowym workflow
+## Obecny kod jako referencja — co warto przejąć, co odpuścić
 
-Shell jest **mapping-driven** i w dużej części gotowy na nowy graf:
+**Działało dobrze (warto powtórzyć w nowym):**
+- Panel mapping-driven: `panel.js` ustawiał `mapping.inputs.<klucz> → [nodeId, slot]`.
+  Rozdział „workflow jako dane" od „logiki panelu" był słuszny — graf można było zmieniać
+  bez ruszania kodu. To zatrzymujemy jako wzorzec.
+- Launcher jako orkiestrator procesów: jeden przycisk startował ComfyUI + Photoshop +
+  UXP + ładowanie panelu. To realny pain killer dla usera nietechnicznego.
+- Izolowany runtime ComfyUI w `%TEMP%` (osobny input/output/db) — nie brudził głównej instalacji.
 
-- **`panel.js` `applyWorkflowInputs`** ustawia `mapping.inputs.<klucz> → [nodeId, slot]`.
-  Stare klucze koloru (`refineSource`, `backgroundPreserveThreshold`, `toneRadius`,
-  `chromaRadius`) są osłonięte `if (mapping.inputs.X)` — nowy mapping bez nich je pomija.
-  Klucze rdzeniowe, których nowy workflow nadal potrzebuje: `sourceImage`, `selectionMask`,
-  `prompt`, `negativePrompt`, `steps`, `cfg`, `seed`, `seedRandomize`, `width`, `height`,
-  `crop{Left,Top,Width,Height}`, `doc{Width,Height}`, `lorasJson`.
+**Bolało / do przemyślenia (czego nie powtarzać):**
+- Rozmiar: `lib.rs` ~2940 l., `App.tsx` ~1471 l., `panel.js` ~3398 l. — monolity z dużą
+  ilością boilerplate'u (struktury readiness, walidacje instalacji, 3 osobne pollery statusu).
+- Kontrakt węzłów zaszyty na sztywno w launcherze (lista klas `RasterRelay*`) — sprzęgał
+  launcher z konkretnym grafem. Nowy launcher nie powinien znać nazw węzłów.
+- Cała konfiguracja (jakość, LoRA) w launcherze, a panel tylko ją czytał — rozważyć
+  przeniesienie większości decyzji do samej wtyczki (mniej skakania między oknami).
 
-- **Sloty plików workflow** (puste po resecie, launcher je instaluje):
-  `photoshop_plugin/workflows/inpainting-api.json` + `inpainting-api.mapping.json`.
+## Nowy launcher — propozycja lean MVP (do uzgodnienia)
 
-- **Twardo zaszyte do zmiany** — `lib.rs` `workflow_required_classes()` (~l. 1998):
-  lista klas węzłów, w tym usunięte `RasterRelay{LoraStack,PadToDocument,ReferenceColorLock,SaveImage}`.
-  Readiness nie przejdzie, póki ta lista nie opisze klas NOWEGO grafu.
+Najmniejsza pętla, która daje wartość; reszta dopiero gdy potrzebna:
+1. Wykryj / wskaż folder ComfyUI, sprawdź obecność wymaganych modeli.
+2. Jeden przycisk: start ComfyUI + Photoshop + UXP + załaduj panel.
+3. Status: czy ComfyUI odpowiada, czy panel załadowany.
 
-## Środowisko (bez zmian)
+Odłożone do czasu realnej potrzeby (YAGNI): instal-slot na workflow/mapping, walidacja
+kontraktu węzłów, centrum jakości, UI LoRA. Część z tego może w ogóle wejść do wtyczki.
 
-ComfyUI `127.0.0.1:8188`. Launcher uruchamia izolowany runtime w
-`%TEMP%\RasterRelay\comfy-runtime`. Wymagane modele (zaszyte w `lib.rs`):
-`flux-2-klein-9b-Q4_K_M.gguf` (unet), `qwen_3_8b_fp8mixed.safetensors` (text enc),
-`flux2-vae.safetensors` (vae). Custom nodes instalowane jako KOPIA → po edycji
-reinstal + restart ComfyUI.
+Stack: do decyzji — Tauri+React (sprawdzone na Windows, mocna kontrola procesów w Rust)
+vs coś lżejszego. Rekomendacja: zostać przy Tauri, ale napisać szczupło.
 
-## Lekcje z usuniętego pipeline'u (warte uwagi przy projektowaniu nowego)
+## Nowa wtyczka — propozycja lean MVP (do uzgodnienia)
+
+Rdzeń pętli: zaznacz obszar → wpisz prompt → generuj przez ComfyUI → wstaw wynik.
+Wzorzec mapping-driven zostaje (workflow = dane). **Otwarte:** co konkretnie ma być
+„bardziej przemyślane" — to wie tylko user (patrz pytania niżej).
+
+## Środowisko ComfyUI (bez zmian)
+
+ComfyUI `127.0.0.1:8188`. Izolowany runtime w `%TEMP%\RasterRelay\comfy-runtime`.
+Modele: `flux-2-klein-9b-Q4_K_M.gguf` (unet), `qwen_3_8b_fp8mixed.safetensors` (text enc),
+`flux2-vae.safetensors` (vae). RTX 3090 24GB. Custom nody instalowane jako KOPIA →
+po edycji reinstal + restart ComfyUI.
+
+## Lekcje z usuniętego pipeline'u (projektując nowy graf)
 
 - Klein GGUF ignoruje concat conditioning → InpaintModelConditioning bezużyteczny;
-  działa DifferentialDiffusion (soft maska).
+  działa DifferentialDiffusion (soft maska = gradient denoise per piksel).
 - Korekta koloru tylko przy szwie (seam-band) — wnętrze obiektu ma prawo różnić się od tła.
 - Upscale małych wycinków NIE poprawia ostrości na Flux2 Klein (zmierzone). Generuj natywnie ≤~1.15MP.
+- Rozkład zmian tonu bimodalny (dryf <0.05 vs intencja >0.15) — próg ~0.10 separuje.
+- Globalny Reinhard nieskuteczny; dyfuzja tonu LF otoczenia do wnętrza działała.
 - ICC: PNG z ComfyUI bez tagu → dokument roboczy PS trzymaj w sRGB.
+- Pomiar jakości: dL_seam + seam_step vs naturalna zmienność oryginału (nie wartość absolutna).
 
-## Do zdecydowania przed rozbudową
+## Otwarte decyzje (zanim ruszy kod)
 
-1. Czy nowe podejście zostaje na ComfyUI + lokalny Flux Klein, czy zmienia silnik/host?
-2. Jaki jest nowy graf inpaintingu (od tego zależy `workflow_required_classes()` i klucze mappingu)?
-3. Czy stripować z `panel.js`/`lib.rs` martwy kontrakt starego łańcucha koloru teraz,
-   czy zostawić osłonięty (no-op) do czasu zdefiniowania nowego grafu?
+1. **Wtyczka — co „lepiej przemyślane"?** Co frustrowało w starym panelu (UX? wolność/precyzja
+   zaznaczenia? prompt? podgląd wariantów? szybkość?). To wyznacza priorytety v1.
+2. **Launcher — stack:** zostać przy Tauri+React czy spróbować lżej?
+3. **Podział odpowiedzialności launcher ↔ wtyczka:** ile konfiguracji przenieść do panelu?
+4. **Kolejność:** zaczynamy od launchera (środowisko wstaje) czy od wtyczki (pętla edycji),
+   na tym samym starym grafie jako tymczasowym, czy od razu projektujemy nowy graf?
