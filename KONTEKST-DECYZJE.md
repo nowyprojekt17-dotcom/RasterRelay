@@ -24,6 +24,13 @@ Po co to istnieje:
 **Główne wyzwanie produktu:** wygenerowana łata **odstaje kolorem/jasnością** od reszty —
 widać szew. Bezszwowe wtopienie wyniku w otoczenie to sedno jakości.
 
+**Zasada: JEDEN przepływ, BEZ trybów.** Jeden motyw przewodni: zaznacz obszar → wpisz prompt
+opisujący edycję → model wpasowuje wynik w zaznaczenie tak, by nie było widać wklejki.
+Usuwanie, podmiana, zmiana koloru, domalowanie — to wszystko robi model edytujący **samym
+promptem**. Nie rozbijamy tego na tryby (to sztuczna komplikacja grafu/UI). Jedyne dodatkowe
+zadanie workflow poza generacją to **bezszwowe wtopienie**. Ewentualne „jak mocno wolno zmienić
+obszar" to przyszły **suwak (jeden parametr)**, nie tryb — i tylko jeśli testy go wymuszą.
+
 Launcher = narzędzie pomocnicze: odpala całe środowisko (ComfyUI + Photoshop + panel)
 jednym kliknięciem, bo użytkownik jest nietechniczny.
 
@@ -90,7 +97,6 @@ Obserwacje o samym problemie/modelu — przydatne, nawet jeśli podejście się 
 ## 7. Otwarte pytania
 
 ### Blokujące start workflow (faza 1)
-- Jakie typy edycji ma obsłużyć workflow v1 (usuwanie obiektu / podmiana / domalowanie / zmiana koloru…)? *(do ustalenia)*
 - Na jakich przypadkach testowych iterujemy (wybór z `test-images/`)? *(do ustalenia)*
 
 ### Faza 2 (po gotowym workflow)
@@ -103,6 +109,7 @@ Obserwacje o samym problemie/modelu — przydatne, nawet jeśli podejście się 
 - ~~Model/silnik~~ → Flux Klein 9B na v1, multi-model później (sekcja 3).
 - ~~Definicja „zadowalających rezultatów"~~ → werdykt użytkownika okiem, agent filtruje słabe wyniki (sekcja 3).
 - ~~Skąd świeży start~~ → odwrócenie kolejności pracy na workflow-first (sekcja 2); kierunek nie wynikał z rozczarowania, tylko z lepszej metodyki.
+- ~~Tryby edycji~~ → BEZ trybów; jeden przepływ sterowany promptem (sekcja 1).
 
 ## 8. Powiązane materiały
 
