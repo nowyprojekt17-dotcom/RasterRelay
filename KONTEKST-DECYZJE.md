@@ -76,6 +76,21 @@ Nie budujemy launchera/wtyczki wokół niesprawdzonego workflow. Jakość udowad
   (Impact/Inspire/Crystools/SAM1: piexif, webcolors, deepdiff, segment-anything, imageio-ffmpeg).
 - **2026-06-21 — ✅ Weryfikacja arsenału.** Wszystkie 11 nowych pakietów importują się czysto w ComfyUI
   (zero IMPORT FAILED). Lista + opisy: `WEZLY-ARSENAL.md`.
+- **2026-06-21 — ✅ Pierwszy działający workflow (v1).** `comfy-workflows/v1-inpaint-cropstitch.json`:
+  rdzeń Flux.2 Klein (ReferenceLatent edit + SetLatentNoiseMask, cfg=1, 20 kroków/euler) owinięty w
+  Inpaint-Crop&Stitch (crop 1024² + kontekst 1.5×, blend 32px), **bez węzłów koloru**. Test: podmiana
+  puszki Monster → granatowa puszka (`results/v1-can_00001_.png`, ~48s). Pomiar: poza maską nietknięte
+  (|ΔRGB|=0.13/255), gradient na konturze res 6.27 < orig 10.40 → brak mierzalnej linii szwu. Baza Flux
+  wzięta z zapisanego w ComfyUI `workflow_v0.3` (rdzeń na standardowych węzłach; stare RasterRelay* pominięte).
+- **2026-06-21 — Ocena v1 (panel + metryki) → REFRAME problemu.** Szew jest rozwiązany przez sam
+  crop+stitch+blend (granica niewidoczna, potwierdzone pomiarem i panelem). **Prawdziwy następny problem
+  to spójność OŚWIETLENIA generowanego obiektu**, nie szew. Panel „światło/kolor": fail 7/10 — nowa
+  puszka oświetlona zimno (tylko monitor), główny refleks po złej stronie, brak ciepłego bounce od
+  biurka i turkusu od klawiatury. „Realizm": concern 5/10 — wieczko/pull-tab rozmyte, perspektywa elipsy,
+  halucynacja tekstu „RUPNEY". „Intencja": minor 3/10 — podmiana udana, ale kolor wyszedł czarny zamiast
+  granatowego. WNIOSEK: stary projekt walczył o kolor na szwie; tu szew jest za darmo z crop&stitch, a
+  dźwignia jakości to dopasowanie ŚWIATŁA generowanej treści do sceny. Hipoteza v2: większy kontekst cropu
+  (model „widzi" więcej sceny → lepiej dopasuje światło) + prompt na światło i „unbranded/no text".
 - **2026-06-21 — Metodyka workflow-first.** Najpierw działające, sprawdzone workflow w ComfyUI,
   dopiero potem launcher i wtyczka. (szczegóły w sekcji 2)
 - **2026-06-21 — Model v1: Flux Klein 9B.** Zostajemy przy nim na start. Później możliwe
