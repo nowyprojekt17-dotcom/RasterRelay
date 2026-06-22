@@ -26,3 +26,9 @@ photoshop_plugin/rasterrelay-lora-config.json
 # Local sqlite scratch DBs (created by MCP/bridge tooling at runtime)
 generations.db
 generations.db-*
+
+# scratch podglady masek i temp
+test-images/_ov_*.png
+test-images/_rr_mask_overlay.png
+_seamtmp/
+tmpcrop/

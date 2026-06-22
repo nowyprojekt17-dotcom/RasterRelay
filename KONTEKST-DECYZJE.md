@@ -91,6 +91,16 @@ Nie budujemy launchera/wtyczki wokół niesprawdzonego workflow. Jakość udowad
   granatowego. WNIOSEK: stary projekt walczył o kolor na szwie; tu szew jest za darmo z crop&stitch, a
   dźwignia jakości to dopasowanie ŚWIATŁA generowanej treści do sceny. Hipoteza v2: większy kontekst cropu
   (model „widzi" więcej sceny → lepiej dopasuje światło) + prompt na światło i „unbranded/no text".
+- **2026-06-21 — Test na 3 różnych obrazach (workflow v2).** Trzy operacje na trzech obrazach:
+  (1) Mustang — podmiana nieba: ✅ czyste niebo, linia dachu czysta (`results/t2-mustang_00001_.png`).
+  (2) Król na tronie — przebarwienie szaty na granat+złoto: ✅ przejście biel→granat naturalne, szew
+  niewidoczny (res 15.59<17.06), światło dopasowane (`results/t3-king_00001_.png`).
+  (3) Pickup AGAT — usuwanie brandingu z drzwi: ⚠ rekonstrukcja wrapu znakomita i szew niewidoczny
+  (res 12.73<16.60), ale tekst usunięty NIEPEŁNIE — szczątki „AT/UP" (maska nie objęła „AGAT GROUP"
+  po prawej + model dorobił litery) (`results/t1-pickup_00001_.png`). WNIOSEK: pipeline dobrze
+  generalizuje (recolor/tło/tekstura, 3 różne obrazy). LEKCJA usuwania tekstu: maska MUSI objąć cały
+  napis z marginesem, a negatyw na litery nie wystarcza — model lubi re-halucynować tekst; rozważyć
+  większe mask_expand lub auto-maskę tekstu (SAM2/Florence2).
 - **2026-06-21 — Metodyka workflow-first.** Najpierw działające, sprawdzone workflow w ComfyUI,
   dopiero potem launcher i wtyczka. (szczegóły w sekcji 2)
 - **2026-06-21 — Model v1: Flux Klein 9B.** Zostajemy przy nim na start. Później możliwe
