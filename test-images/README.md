@@ -2,4 +2,11 @@
 
 This folder is intentionally reserved for manual testing images and visual reference inputs used during the RasterRelay rebuild.
 
-Keep source/reference images here. Generated outputs, temporary masks, logs, and runtime artifacts should stay outside this folder unless they are intentionally promoted to a reusable reference image.
+**Tu trzymamy WYŁĄCZNIE obrazy źródłowe do testowania workflow.** Nic więcej.
+
+Reszta ma swoje miejsce:
+- maski testowe → `masks/`
+- wyniki edycji (output workflow) → `results/`
+- podglądy/temp (scratch) → `.scratch/` (ignorowane przez git)
+
+Nie wrzucaj tu masek, wyników, konwersji formatu ani plików tymczasowych.

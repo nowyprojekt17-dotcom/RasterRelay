@@ -27,8 +27,7 @@ photoshop_plugin/rasterrelay-lora-config.json
 generations.db
 generations.db-*
 
-# scratch podglady masek i temp
-test-images/_ov_*.png
-test-images/_rr_mask_overlay.png
+# scratch (podglady masek, temp) — nie commitowac
+.scratch/
 _seamtmp/
 tmpcrop/

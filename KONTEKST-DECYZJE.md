@@ -116,6 +116,8 @@ Nie budujemy launchera/wtyczki wokół niesprawdzonego workflow. Jakość udowad
 - Nie inspirować się starymi rozwiązaniami ani nie ciągnąć projektu w stronę poprzedniej wersji.
 - Nie zaczynać kodowania, dopóki użytkownik nie powie wprost „ruszamy".
 - Nie łatać starego kodu launchera/panelu — idzie do wymiany, nie do polerowania.
+- **Nie zaśmiecać `test-images/`** — ten folder to WYŁĄCZNIE obrazy źródłowe do testów.
+  Konwencja folderów: maski → `masks/`, wyniki → `results/`, podglądy/temp → `.scratch/` (gitignore).
 
 ## 5. Znane pułapki (zmierzone fakty, nie pomysły)
 
