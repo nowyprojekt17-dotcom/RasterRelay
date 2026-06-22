@@ -101,6 +101,13 @@ Nie budujemy launchera/wtyczki wokół niesprawdzonego workflow. Jakość udowad
   generalizuje (recolor/tło/tekstura, 3 różne obrazy). LEKCJA usuwania tekstu: maska MUSI objąć cały
   napis z marginesem, a negatyw na litery nie wystarcza — model lubi re-halucynować tekst; rozważyć
   większe mask_expand lub auto-maskę tekstu (SAM2/Florence2).
+- **2026-06-23 — v3: multi-LoRA + maska pędzlem** (`comfy-workflows/v3-lora-brushmask.json`). Oba węzły
+  były już dostępne, nic nie dociągano. (1) `Power Lora Loader (rgthree)` — wiele LoRA w jednym węźle
+  (on/off + siła), wpięty na model+clip; wpięte 2 realne LoRA z `models/loras`. (2) Maska z wyjścia MASK
+  węzła `Load Image` = natywny **MaskEditor** (pędzel; PPM→Open in MaskEditor); alternatywa `MaskPainter`
+  (Impact Pack). Zweryfikowano headless (oba LoRA on, maska jako alfa RGBA): `node_errors:{}`, LoRA
+  ładują się (~92s vs 48s), `results/v3-verify_00001_.png`. Plik w formacie API (MCP ComfyUI odłączony
+  w tej sesji → wersję UI dobuduję gdy wróci/na prośbę).
 - **2026-06-21 — Metodyka workflow-first.** Najpierw działające, sprawdzone workflow w ComfyUI,
   dopiero potem launcher i wtyczka. (szczegóły w sekcji 2)
 - **2026-06-21 — Model v1: Flux Klein 9B.** Zostajemy przy nim na start. Później możliwe

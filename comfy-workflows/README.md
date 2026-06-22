@@ -36,3 +36,22 @@ Wynik: `results/v2-can_00001_.png`. Światło puszki zgodne ze sceną (ciepła g
 ciepły dół), brak halucynowanego tekstu. Szew nadal niewidoczny (poza maską |ΔRGB|=0.20; kontur res=6.26).
 Pozostałe do dopracowania: odcień bardziej granat niż teal, geometria wieczka/elipsy.
 
+## v3-lora-brushmask.json
+
+Dwie zmiany na życzenie usera (oba węzły już były dostępne — nic nie dociągano):
+
+1. **Multi-LoRA** — wstawiony `Power Lora Loader (rgthree)` na ścieżce model+clip
+   (`UnetLoaderGGUF`+`CLIPLoader` → Power Lora Loader → `ModelSamplingFlux`/`CLIPTextEncode`).
+   Jeden węzeł, wiele LoRA, każda z włącznikiem on/off i siłą. W pliku wpięte 2 realne LoRA Flux2 Klein
+   (`KLEIN-Unchained-V2`, `Dever-Devil-May-Cry`) jako przykład — podmień/strój wg potrzeb. Format API:
+   wpisy `LORA_n = {on, lora, strength[, strengthTwo]}`.
+2. **Maska pędzlem** — źródło maski przełączone na wyjście **MASK węzła `Load Image`** (usunięto osobny
+   `LoadImageMask`). To jest natywny **MaskEditor** ComfyUI: PPM na „Load Image" → „Open in MaskEditor"
+   → malujesz obszar do edycji. Alternatywa w grafie: `MaskPainter` (Impact Pack, też zainstalowany).
+
+Weryfikacja headless (`results/v3-verify_00001_.png`, oba LoRA on, maska podana jako kanał alfa RGBA =
+odpowiednik namalowanej): graf przyjęty bez błędów (`node_errors: {}`), LoRA załadowane (~92s vs ~48s bez),
+wynik czysty, szew niewidoczny. UWAGA: plik jest w formacie API (do uruchamiania). Do interaktywnego
+malowania/UI LoRA otwórz w ComfyUI; gdyby Twoja wersja nie wczytała API-JSON jako grafu, zgłoś —
+zbuduję wersję w formacie UI (most ComfyUI MCP rozłączył się w tej sesji).
+

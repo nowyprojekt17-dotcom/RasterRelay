@@ -1,0 +1,39 @@
+{
+  "1": { "class_type": "LoadImage", "inputs": { "image": "rr-test-can-source.jpg" } },
+  "3": { "class_type": "InpaintCropImproved", "inputs": {
+    "image": ["1", 0], "mask": ["1", 1],
+    "downscale_algorithm": "bilinear", "upscale_algorithm": "bicubic",
+    "preresize": false, "preresize_mode": "ensure minimum resolution",
+    "preresize_min_width": 1024, "preresize_min_height": 1024, "preresize_max_width": 16384, "preresize_max_height": 16384,
+    "mask_fill_holes": true, "mask_expand_pixels": 0, "mask_invert": false,
+    "mask_blend_pixels": 32, "mask_hipass_filter": 0.1,
+    "extend_for_outpainting": false, "extend_up_factor": 1, "extend_down_factor": 1, "extend_left_factor": 1, "extend_right_factor": 1,
+    "context_from_mask_extend_factor": 2.5,
+    "output_resize_to_target_size": true, "output_target_width": 1024, "output_target_height": 1024,
+    "output_padding": "32", "device_mode": "gpu (much faster)"
+  } },
+  "4": { "class_type": "UnetLoaderGGUF", "inputs": { "unet_name": "flux-2-klein-9b-Q4_K_M.gguf" } },
+  "5": { "class_type": "CLIPLoader", "inputs": { "clip_name": "qwen_3_8b_fp8mixed.safetensors", "type": "flux2" } },
+  "23": { "class_type": "Power Lora Loader (rgthree)", "inputs": {
+    "model": ["4", 0], "clip": ["5", 0],
+    "LORA_1": { "on": true, "lora": "KLEIN-Unchained-V2.safetensors", "strength": 0.7 },
+    "LORA_2": { "on": true, "lora": "Dever-Devil-May-Cry-FLUX2-Klein-9B.safetensors", "strength": 0.6 }
+  } },
+  "6": { "class_type": "VAELoader", "inputs": { "vae_name": "flux2-vae.safetensors" } },
+  "7": { "class_type": "GetImageSize", "inputs": { "image": ["3", 1] } },
+  "8": { "class_type": "ModelSamplingFlux", "inputs": { "model": ["23", 0], "max_shift": 1.15, "base_shift": 0.5, "width": ["7", 0], "height": ["7", 1] } },
+  "9": { "class_type": "CLIPTextEncode", "inputs": { "clip": ["23", 1], "text": "Replace the can with a tall slim navy-blue matte aluminum energy drink can with a brushed silver lid, unbranded with no text or logo, plain surface, standing upright on the wooden desk. Light it to match the scene exactly: warm key light from the upper left, warm reflected bounce from the wooden desk on the lower body, subtle teal glow from the backlit keyboard on the right side, grounded by a soft warm contact shadow. Shallow depth of field." } },
+  "10": { "class_type": "CLIPTextEncode", "inputs": { "clip": ["23", 1], "text": "blurry, distortion, visible seam, halo, pasted look, harsh edges, warped, deformed, extra objects, text, logo, branding, letters, cold flat lighting, wrong light direction" } },
+  "11": { "class_type": "VAEEncode", "inputs": { "pixels": ["3", 1], "vae": ["6", 0] } },
+  "12": { "class_type": "ReferenceLatent", "inputs": { "conditioning": ["9", 0], "latent": ["11", 0] } },
+  "13": { "class_type": "ReferenceLatent", "inputs": { "conditioning": ["10", 0], "latent": ["11", 0] } },
+  "14": { "class_type": "SetLatentNoiseMask", "inputs": { "samples": ["11", 0], "mask": ["3", 2] } },
+  "15": { "class_type": "CFGGuider", "inputs": { "model": ["8", 0], "positive": ["12", 0], "negative": ["13", 0], "cfg": 1 } },
+  "16": { "class_type": "RandomNoise", "inputs": { "noise_seed": 42 } },
+  "17": { "class_type": "KSamplerSelect", "inputs": { "sampler_name": "euler" } },
+  "18": { "class_type": "Flux2Scheduler", "inputs": { "steps": 20, "width": ["7", 0], "height": ["7", 1] } },
+  "19": { "class_type": "SamplerCustomAdvanced", "inputs": { "noise": ["16", 0], "guider": ["15", 0], "sampler": ["17", 0], "sigmas": ["18", 0], "latent_image": ["14", 0] } },
+  "20": { "class_type": "VAEDecode", "inputs": { "samples": ["19", 0], "vae": ["6", 0] } },
+  "21": { "class_type": "InpaintStitchImproved", "inputs": { "stitcher": ["3", 0], "inpainted_image": ["20", 0] } },
+  "22": { "class_type": "SaveImage", "inputs": { "images": ["21", 0], "filename_prefix": "RasterRelay/v3-loratest" } }
+}
